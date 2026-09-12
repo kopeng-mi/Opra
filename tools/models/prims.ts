@@ -1,16 +1,20 @@
-// Shared geometry helpers and the material palette, copied verbatim from AstraWars
+// Shared geometry helpers and the material palette. The palette of record is what the references
+// actually contain (plan-04 A2, s3.5): board and hulls both came back greyer and less blue-green
+// than the prompts asked, so the materials moved to the observed values. The UI inks in
+// ui/tokens.h follow the same bands (plan-04 A2), so ships and HUD belong to one world.
+// Copied verbatim from AstraWars
 // src/models.ts (box, cylinder, hull, palette) and src/fleet.ts (plate, drive, thrusters).
 // Axes: nose +Y, dorsal +Z, starboard +X. Units are metres.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import * as zlib from 'node:zlib';
 
-export const armor = new THREE.MeshStandardMaterial({ color: '#bac4c3', roughness: 0.64, metalness: 0.55 });
-export const lightArmor = new THREE.MeshStandardMaterial({ color: '#e2e3d8', roughness: 0.52, metalness: 0.4 });
-export const dark = new THREE.MeshStandardMaterial({ color: '#202e38', roughness: 0.7, metalness: 0.85 });
-export const metal = new THREE.MeshStandardMaterial({ color: '#667681', roughness: 0.5, metalness: 0.86 });
-export const copper = new THREE.MeshStandardMaterial({ color: '#c88755', roughness: 0.65, metalness: 0.6 });
-export const black = new THREE.MeshStandardMaterial({ color: '#0c141a', roughness: 0.7, metalness: 0.5 });
+export const armor = new THREE.MeshStandardMaterial({ color: '#a3a7a4', roughness: 0.64, metalness: 0.55 });
+export const lightArmor = new THREE.MeshStandardMaterial({ color: '#ededeA', roughness: 0.52, metalness: 0.4 });
+export const dark = new THREE.MeshStandardMaterial({ color: '#263c43', roughness: 0.7, metalness: 0.85 });
+export const metal = new THREE.MeshStandardMaterial({ color: '#646a6c', roughness: 0.5, metalness: 0.86 });
+export const copper = new THREE.MeshStandardMaterial({ color: '#a56233', roughness: 0.65, metalness: 0.6 });
+export const black = new THREE.MeshStandardMaterial({ color: '#171b1e', roughness: 0.7, metalness: 0.5 });
 export const glass = new THREE.MeshStandardMaterial({ color: '#376c7c', roughness: 0.25, metalness: 0.7, emissive: '#306675', emissiveIntensity: 0.6 });
 export const oreShell = new THREE.MeshStandardMaterial({ color: '#6a6258', roughness: 0.95, metalness: 0.12 });
 export const oreVein = new THREE.MeshBasicMaterial({ color: '#efb879' });
@@ -18,8 +22,8 @@ for (const material of [armor, lightArmor, dark, metal, copper, black, glass, or
 
 // Fleet geometry is authored in metres, nose +Y, dorsal +Z. Static plates are batched by material;
 // engines and RCS remain separate so their transforms can follow the simulation.
-export const teal = new THREE.MeshStandardMaterial({ color: '#326b70', metalness: 0.55, roughness: 0.42 });
-export const ochre = new THREE.MeshStandardMaterial({ color: '#bc783c', metalness: 0.45, roughness: 0.68 });
+export const teal = new THREE.MeshStandardMaterial({ color: '#275459', metalness: 0.55, roughness: 0.42 });
+export const ochre = new THREE.MeshStandardMaterial({ color: '#ae7040', metalness: 0.45, roughness: 0.68 });
 export const ceramic = new THREE.MeshStandardMaterial({ color: '#8299a9', metalness: 0.65, roughness: 0.35 });
 export const exhaust = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
@@ -1127,6 +1131,36 @@ export function jet_nozzle(parent: THREE.Object3D, effects: THREE.Mesh[], opts: 
   parent.add(jet);
   effects.push(jet);
   return jet;
+}
+/**
+ * The modular flange (plan-04 A6, §2.5): the one interface every stackable component carries at
+ * both ends. 2.5 m diameter, ~0.18 m ring, 8 raised bolt bosses on equal stations, two copper
+ * alignment keys at 0° and 180°. Built about local +Y at `pos`, facing `normal`, so a module on
+ * any axis gets the identical part by passing its stack direction.
+ */
+export const FLANGE_RADIUS = 1.25;
+export function flange(root: THREE.Object3D, material: THREE.Material, pos: number[], normal: number[] = [0, 1, 0]): THREE.Group {
+  const site = new THREE.Group();
+  site.position.set(pos[0], pos[1], pos[2]);
+  site.quaternion.setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(normal[0], normal[1], normal[2]).normalize());
+  root.add(site);
+  // Ring plate and its rolled edge: the plate lands the bolts, the torus is the lip that catches
+  // light. A three.js torus lies in the XY plane, so the lip yaws 90° about X to lie flat
+  // about the +Y stack axis.
+  cylinder(site, material, FLANGE_RADIUS, FLANGE_RADIUS, 0.1, [0, 0, 0], 32);
+  torus(site, material, FLANGE_RADIUS - 0.09, 0.09, [0, 0.05, 0], [Math.PI / 2, 0, 0], 8, 32);
+  // Eight bolt bosses, raised proud of the face on the ring centreline.
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    cylinder(site, material, 0.09, 0.09, 0.18,
+      [Math.cos(angle) * (FLANGE_RADIUS - 0.09), 0.06, Math.sin(angle) * (FLANGE_RADIUS - 0.09)], 8);
+  }
+  // Copper alignment keys at 0° and 180°: the only warm-coloured thing on the interface, so a
+  // loader can see the clocking without reading a stencil.
+  for (const side of [1, -1]) box(site, copper, [0.22, 0.16, 0.22], [side * (FLANGE_RADIUS - 0.09), 0.06, 0]);
+  return site;
 }
 
 /** Bare-metal grey used by wreck plating and structural framing across the new assets. */

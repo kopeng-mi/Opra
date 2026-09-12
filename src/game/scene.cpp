@@ -174,6 +174,10 @@ orrery::Frame orrery_frame_for(const World &world, bool true_scale, int target_b
         if (body.parent < 0) mark.elements = orbit::Elements{};
         // The chart's ink: the star is warm, everything else is chart vellum (E11's two inks).
         mark.color = body.parent < 0 ? orrery::ink::STAR : orrery::ink::VELLUM;
+        mark.albedo_map = body.albedo_map;
+        mark.cloud_map = body.cloud_map;
+        mark.night_map = body.night_map;
+        mark.photosphere_map = body.photosphere_map;
         frame.bodies.push_back(mark);
     }
     if (!world.system.bodies.empty() && world.system.belt.parent >= 0) {

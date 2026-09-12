@@ -5,7 +5,7 @@
     "min": [
       -43.4936,
       -90.6039,
-      -10.5
+      -13.2116
     ],
     "max": [
       38.9032,
@@ -17,7 +17,7 @@
     "min": [
       -43.4936,
       -90.6039,
-      -10.5
+      -13.2116
     ],
     "max": [
       38.9032,
@@ -124,18 +124,6 @@
           10.2673,
           7.0426
         ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          11.932,
-          51.8054
-        ],
-        "angle": 1.9295,
-        "half": [
-          8.9295,
-          7.0885
-        ]
       }
     ],
     "bounds_radius": 90.6063
@@ -151,12 +139,12 @@
       "roughness": "derelict_roughness",
       "albedo": "derelict_albedo"
     },
-    "materials": 8
+    "materials": 11
   },
   "stats": {},
   "counts": {
-    "meshes": 9,
-    "vertices": 6264,
-    "triangles": 2088
+    "meshes": 13,
+    "vertices": 7716,
+    "triangles": 2572
   }
 }

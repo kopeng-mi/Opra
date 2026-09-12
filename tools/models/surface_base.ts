@@ -123,13 +123,19 @@ export function build(): THREE.Object3D {
     box(apron, hazardPaint, [196.0, 1.4, 0.3], [-4.0, edge * 72.0, 0.16]);
     box(apron, hazardPaint, [1.4, 150.0, 0.3], [-4.0 + edge * 95.0, 0, 0.16]);
   }
-  // The two decks: the freighter pad at the origin, the shuttle pad out on the apron's edge.
+  // The two decks: equal circular pads, the plan view's own layout, with the berth anchors the
+  // sim docks to (`dock.pad.A` / `dock.pad.B`, facing local up).
   const big = new THREE.Group(); group.add(big);
-  landing_pad_assembly(big, { id: 'padA', radius: 21, clamps: 4, lights: 6 });
+  landing_pad_assembly(big, { id: 'pad.A', radius: 21, clamps: 4, lights: 6 });
   const small = new THREE.Group();
   small.position.set(66.0, 46.0, 0);
   group.add(small);
-  landing_pad_assembly(small, { id: 'padB', radius: 13, clamps: 0, lights: 4, lamp: '#e8c98a' });
+  landing_pad_assembly(small, { id: 'pad.B', radius: 18, clamps: 4, lights: 4, lamp: '#e8c98a' });
+  // Walkway: a covered corridor from the big pad to the shuttle pad and on to the habitat, so
+  // the crew never crosses open regolith between the decks.
+  box(group, hullPaint, [30.0, 4.0, 3.0], [38.0, 26.0, 1.5], 0.6);
+  box(group, hullPaint, [44.0, 4.0, 3.0], [-24.0, 30.0, 1.5], 0.12);
+  for (let i = 0; i < 5; i++) box(group, glass, [1.6, 4.2, 1.2], [26.0 + i * 6.0, 30.5 - i * 1.1, 1.5], 0.6);
   habitat(group, -66.0, 34.0, 0.35);
   fuel_plant(group, -62.0, -46.0);
   comms_mast(group, 46.0, -66.0);

@@ -215,23 +215,28 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         choice.manual = true;
         app.toast(minimap_mode_name(choice.mode));
     }
-    // The hand on the camera: Ctrl and the mouse. Vertical movement raises and lowers the orbit's
-    // angle above the plane; horizontal movement slides the eye without turning it, because yaw
-    // stays locked to world north and the collar's bearing frame depends on that. The pitch is
-    // written back to the setting, so the angle the pilot settles on is the angle that comes back.
-    const bool looking = input.held(SDL_SCANCODE_LCTRL) || input.held(SDL_SCANCODE_RCTRL);
-    if (looking && (input.pointer_delta.x != 0.0f || input.pointer_delta.y != 0.0f)) {
-        const double metres_per_px =
-            static_cast<double>(app.camera.half_height) * 2.0 / static_cast<double>(height);
-        look_step(app.pitch, app.camera_pan, input.pointer_delta, static_cast<float>(metres_per_px),
-                  CAMERA_PITCH_MIN, CAMERA_PITCH_MAX, config::LOOK_PAN_FRACTION *
-                                                        static_cast<double>(app.camera.half_height));
-        app.settings.camera_pitch =
-            std::clamp(app.pitch * 57.29577951308232f, config::LOOK_PITCH_MIN_DEG,
-                       config::LOOK_PITCH_MAX_DEG);
-        app.settings_dirty = true;
-    }
-    if (!looking) {
+    // The hand on the camera (A4): Ctrl and the mouse, a grab of the plane itself. On press the
+    // world point under the cursor is unprojected and held; while held, the same unprojection of
+    // the moving cursor is what the pan is stepped by, so the grabbed ground stays under the
+    // cursor at any pitch and any zoom - the projection does the work, not a pixels-to-metres
+    // scale that is only true on one screen row. Pitch is not touched: F1 reads it from settings
+    // once, at camera construction, and nothing in flight writes it.
+    const bool looking = input.pointer_valid &&
+                         (input.held(SDL_SCANCODE_LCTRL) || input.held(SDL_SCANCODE_RCTRL));
+    if (looking) {
+        if (!app.look_anchor.has_value()) {
+            app.look_anchor = unproject(app.camera, input.pointer.x, input.pointer.y,
+                                        static_cast<float>(width), static_cast<float>(height));
+        } else {
+            // Every frame, not only when the cursor moves: the follow moves the camera underneath
+            // a still hand, and the grab has to hold against that too.
+            const glm::dvec2 cursor =
+                unproject(app.camera, input.pointer.x, input.pointer.y, static_cast<float>(width),
+                          static_cast<float>(height));
+            look_step(app.camera_pan, *app.look_anchor, cursor);
+        }
+    } else {
+        app.look_anchor.reset();
         // A look is a look: let go and the frame eases back to where the follow put it.
         app.camera_pan = pan_release(app.camera_pan, dt, config::LOOK_RELEASE_TAU);
     }

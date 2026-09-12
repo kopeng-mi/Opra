@@ -3,70 +3,66 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -2.5679,
-      -0.005,
-      -2.7
+      -1.41,
+      -2.15,
+      -1.41
     ],
     "max": [
-      3.39,
-      10.225,
-      2.7
+      2.11,
+      2.15,
+      1.41
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -2.5679,
-      -0.005,
-      -2.7
+      -1.41,
+      -2.15,
+      -1.41
     ],
     "max": [
-      3.39,
-      10.225,
-      2.7
+      2.11,
+      2.15,
+      1.41
     ]
   },
   "collider": {
-    "halfLength": 5.115,
-    "halfWidth": 2.979,
+    "halfLength": 2.15,
+    "halfWidth": 1.76,
     "shapes": [
       {
         "kind": "box",
         "pos": [
           0,
-          5.3
+          0
         ],
         "angle": 0,
         "half": [
-          2.1448,
-          4.5
+          1.25,
+          2.14
         ]
       },
       {
-        "kind": "box",
+        "kind": "circle",
         "pos": [
           0,
-          5.3
+          0
         ],
-        "angle": 0,
-        "half": [
-          2.2813,
-          2.8
-        ]
+        "radius": 1.37
       },
       {
         "kind": "box",
         "pos": [
-          2.4419,
-          5.1082
+          1.4025,
+          0.418
         ],
-        "angle": -1.4273,
+        "angle": -1.28,
         "half": [
-          4.3982,
-          0.6606
+          1.7584,
+          0.4402
         ]
       }
     ],
-    "bounds_radius": 10.2964
+    "bounds_radius": 3.2762
   },
   "ports": [],
   "effects": [],
@@ -79,12 +75,12 @@
       "roughness": "tank_small_roughness",
       "albedo": "tank_small_albedo"
     },
-    "materials": 6
+    "materials": 5
   },
   "stats": {},
   "counts": {
-    "meshes": 6,
-    "vertices": 2436,
-    "triangles": 812
+    "meshes": 5,
+    "vertices": 8376,
+    "triangles": 2792
   }
 }

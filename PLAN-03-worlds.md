@@ -1,4 +1,4 @@
-> **Status: complete.** The live plan is [PLAN-04-assets.md](PLAN-04-assets.md).
+> **Status: complete.** The live plan is [PLAN-05-legibility.md](PLAN-05-legibility.md).
 
 Live plan. [PLAN-01](PLAN.md) and [PLAN-02](PLAN-02-system.md) are complete; their decisions bind.
 

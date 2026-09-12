@@ -3,94 +3,122 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -1.0334,
-      -1.9,
-      -1.06
+      -0.4913,
+      0.005,
+      -0.505
     ],
     "max": [
-      1.0334,
-      1.54,
-      1.06
+      0.76,
+      1.545,
+      0.4977
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -1.0334,
-      -1.9,
-      -1.06
+      -0.4913,
+      0.005,
+      -0.505
     ],
     "max": [
-      1.0334,
-      1.88,
-      1.06
+      0.76,
+      1.545,
+      0.4977
     ]
   },
   "collider": {
-    "halfLength": 1.72,
-    "halfWidth": 1.033,
+    "halfLength": 0.77,
+    "halfWidth": 0.626,
     "shapes": [
       {
+        "kind": "circle",
+        "pos": [
+          0,
+          0.815
+        ],
+        "radius": 0.465
+      },
+      {
         "kind": "box",
         "pos": [
           0,
-          -0.025
+          0.92
         ],
         "angle": 0,
         "half": [
-          0.55,
-          0.725
+          0.385,
+          0.11
         ]
       },
       {
         "kind": "box",
         "pos": [
           0,
-          -0.35
+          1.344
         ],
         "angle": 0,
         "half": [
-          0.18,
-          1.55
+          0.238,
+          0.144
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0.59,
+          0.85
+        ],
+        "angle": -1.5708,
+        "half": [
+          0.16,
+          0.17
         ]
       },
       {
         "kind": "box",
         "pos": [
           0,
-          -0.97
+          0.62
         ],
         "angle": 0,
         "half": [
-          1.0334,
-          0.19
+          0.39,
+          0.04
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0.5
+        ],
+        "radius": 0.125
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0.2899,
+          0.255
+        ],
+        "angle": -1.1913,
+        "half": [
+          0.2255,
+          0.0499
         ]
       },
       {
         "kind": "box",
         "pos": [
-          0,
-          -0.15
+          -0.2899,
+          0.255
         ],
-        "angle": 0,
+        "angle": 1.1913,
         "half": [
-          0.15,
-          0.22
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          0,
-          -0.1
-        ],
-        "angle": 0,
-        "half": [
-          0.5,
-          0.06
+          0.2255,
+          0.0499
         ]
       }
     ],
-    "bounds_radius": 2.0208
+    "bounds_radius": 1.6222
   },
   "ports": [],
   "effects": [
@@ -98,7 +126,7 @@
       "node": "strobe",
       "pos": [
         0,
-        1.68,
+        1.4,
         0
       ]
     }
@@ -112,12 +140,12 @@
       "roughness": "nav_buoy_roughness",
       "albedo": "nav_buoy_albedo"
     },
-    "materials": 4
+    "materials": 5
   },
   "stats": {},
   "counts": {
-    "meshes": 7,
-    "vertices": 1443,
-    "triangles": 540
+    "meshes": 8,
+    "vertices": 2955,
+    "triangles": 1044
   }
 }

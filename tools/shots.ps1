@@ -70,6 +70,7 @@ $views = @(
     @{ Name = "flight2";  Args = @("--view", "flight", "--density", "2") },
     @{ Name = "flight3";  Args = @("--view", "flight", "--density", "3") },
     @{ Name = "map";      Args = @("--view", "map", "--seconds", "2") },
+    @{ Name = "body";     Args = @("--view", "body", "--seconds", "2") }
     @{ Name = "chart";    Args = @("--view", "chart") },
     @{ Name = "help";     Args = @("--view", "help") },
     @{ Name = "models";   Args = @("--view", "models", "--seconds", "0") },

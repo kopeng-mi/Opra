@@ -51,7 +51,7 @@ MeshData annulus(float inner_radius, float outer_radius, int segments);
 /** A planform outline in the local XY plane, extruded symmetrically along Z. */
 MeshData prism(const std::vector<glm::vec2> &outline, float depth);
 /** The DRIFT asteroid: icosahedron, sine noise, eight craters, per-vertex tone. */
-MeshData asteroid(float radius, int seed);
+MeshData asteroid(float radius, int seed, int tile_index);
 MeshData ore_chunk();
 /** Unit disc in the local XY plane: bright at the centre, black at the rim. Nebula wash. */
 MeshData nebula_disc(int segments);

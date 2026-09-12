@@ -7,6 +7,8 @@
 // display space and a tonemapped #DCE6E8 is not #DCE6E8.
 #pragma once
 
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <SDL3/SDL.h>
@@ -70,7 +72,7 @@ struct MeshUniforms {
 /** Mirrors the material cbuffer: the factors and which texture slots are actually bound. */
 struct MaterialUniforms {
     glm::vec4 base_color;          // rgb factor, a unused
-    glm::vec4 metallic_roughness;  // x metallic, y roughness
+    glm::vec4 metallic_roughness;  // x metallic, y roughness, z triplanar
     glm::vec4 texture_flags;       // x base colour, y metallic-roughness, z normal, w unlit
 };
 
@@ -85,6 +87,7 @@ struct BodyUniforms {
     glm::vec4 star_color;       // rgb
     glm::vec4 viewport;         // xy pixels, z star pixel radius, w body pixel radius
     glm::vec4 eye_position;     // xyz the camera eye, w unused
+    glm::vec4 maps;             // x albedo, y clouds, z night (or star photosphere), w unused
 };
 
 /** Mirrors the cbuffer in shaders/bloom.hlsl: the source and target texel sizes, and the chain's
@@ -115,6 +118,9 @@ struct SkyDraw {
     int mesh = -1;
     bool shell = false;
     bool star = false;
+    /** The bound maps for this draw, matching the shader's t0..t2; null samples the white texel. */
+    SDL_GPUTexture *maps[3] = {nullptr, nullptr, nullptr};
+    bool tile = false;  // the star's photosphere samples a tile sampler; planets, equirectangular
 };
 
 struct Renderer {
@@ -150,6 +156,20 @@ struct Renderer {
     SDL_GPUTexture *white = nullptr;
     /** Reused every frame: the sort writes into these instead of allocating. */
     std::vector<Instance> sorted_instances;
+    /**
+     * The sky bodies' maps, loaded from assets/textures/manifest.json and keyed by the body's
+     * own map names (plan-04 s3.4). An unknown name is a null texture: the body keeps its
+     * procedural shading rather than crashing.
+     */
+    std::unordered_map<std::string, SDL_GPUTexture *> body_maps;
+    std::vector<SDL_GPUTexture *> body_map_textures;  // every handle, for teardown
+    bool body_manifest_read = false;
+    /** Equirectangular maps wrap in longitude and clamp at the poles; tiles wrap in both axes. */
+    SDL_GPUSampler *map_sampler_equirect = nullptr;
+    SDL_GPUSampler *map_sampler_tile = nullptr;
+    /** Resolves a map name to its texture, reading the manifest on the first miss. */
+    SDL_GPUTexture *map_texture(const std::string &name);
+    /** The frame's runs, opaque first, then effects, then the backdrop: the draw order. */
     std::vector<InstanceRun> opaque_runs;
     std::vector<InstanceRun> effect_runs;
     std::vector<InstanceRun> backdrop_runs;

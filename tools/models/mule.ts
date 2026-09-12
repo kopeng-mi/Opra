@@ -1,124 +1,141 @@
-// Mule: heavy salvage tug, re-authored at F8 (PLAN-03 §7.1). The plan-01 layout is kept — the six
-// external freight pods, the open chassis rails, the two main and two auxiliary drive bells and the
-// four RCS quads all stay where they were, because the compound collider and the port gate are tuned
-// to that envelope. The pods grow a little (heavy freight, 15 x 20 x 12) so that they remain
-// collision shapes: the exporter fits shapes from the *sum* of every cluster's projected area, so
-// small decorative plates dilute the 3% cut and would otherwise drop the pods out of the collider.
-// What the F8 pass adds: rounded command and bow surfaces, lathed bells with gimbal rings, bevelled
-// pod frames with panel relief, and landing legs.
+// Mule: heavy salvage tug, re-authored to the plan-04 spec table (s2.2, A1).
+// Hull 58 m, proportions as drawn 2.45 : 1 : 0.70, so 58 x 23.7 x 16.6. The image wins: the
+// V-open three-segment grapple arms, the towing yoke between them, the glass-segmented cab, the
+// open rail chassis with structure visible through it, six clamped freight pods, deployed
+// radiators abaft midships, the four-bell square cluster, and the dorsal turret forward of the
+// radiators. The collider below reproduces the plan's own table - a single box would span the
+// open chassis and register hits in gaps a Needle flies through, which is exactly why the
+// sidecar's compound shapes are what the sim collides on.
 //
-// Axes: nose +Y, dorsal +Z, starboard +X, metres.
+// Axes as always: nose +Y, dorsal +Z, starboard +X, metres.
 import * as THREE from 'three';
 import {
-  black, copper, dark, frame, glass, hullPaint, lightArmor, metal, ochre,
-  bevelled, box, dock, drive, each_tile, hazard_stripes, hp, hull, lathe, panel_relief,
-  standard_maps, stencil_text, strut, thrusters, torus, tube, type Maps,
+  armor, black, copper, dark, frame, glass, lightArmor, metal, teal, ochre,
+  bevelled, box, cylinder, dock, effect_cone, each_tile, hazard_stripes, hp, lathe, panel_relief,
+  plate, scorch, standard_maps, stencil_text, strut, torus, tube, type Maps,
 } from './prims';
 
-/** Canopy glass for the tug's flight deck: one mapped blister, so the frame seams read on it. */
-const canopy = new THREE.MeshStandardMaterial({
-  color: '#2b5a68', roughness: 0.15, metalness: 0.72, emissive: '#28596a', emissiveIntensity: 0.45,
-});
-canopy.name = 'canopy';
+// Plan frame: L = 58, half-width 11.85, deck +/-8.3.
+const L = 58;
+const HW = 11.85;
+const DECK = 8.3;
+// Along: fraction of length from the nose -> model y (nose +29, stern -29).
+const at = (f: number) => L / 2 - f * L;
 
-/** A gimballed bell over the drive the prims already draw, so the flame keeps its exact place. */
-function bell(root: THREE.Object3D, x: number, y: number, radius: number, segments: number, gimbal: boolean): void {
-  lathe(root, metal, [[radius * 1.14, -8.4], [radius * 0.96, -3.4], [radius * 0.82, 2.4], [radius * 0.7, 6.6], [radius * 0.6, 10.4]], segments, [x, y, 0]);
-  torus(root, copper, radius * 1.12, radius * 0.06, [x, y - 8.3, 0], [Math.PI / 2, 0, 0], 6, 14);
-  if (gimbal) {
-    torus(root, frame, radius * 0.68, radius * 0.1, [x, y + 10.4, 0], [Math.PI / 2, 0, 0], 6, 12);
-    strut(root, copper, [x + radius * 0.62, y + 8.4, 0], [x + radius, y - 1.2, 0], radius * 0.08, 6);
-  }
-}
-
-/** One external freight pod: bevelled shell, end bands, a lashing stripe and a mounting shoe. The
- *  bands are plain boxes, not bevelled: the shell's rounded edges are what the eye reads at range,
- *  and every extra bevelled solid here costs 108 triangles for a banded ring. */
-function freight_pod(root: THREE.Object3D, x: number, y: number): void {
-  bevelled(root, ochre, [15, 20, 12], [x, y, 1], [0, 0, 0], { radius: 0.8, segments: 1 });
-  for (const dy of [-6, 6]) box(root, lightArmor, [15.5, 2.2, 12.6], [x, y + dy, 1]);
-  for (const dy of [-9.2, 9.2]) box(root, dark, [15.2, 1.6, 12.8], [x, y + dy, 1]);
-  box(root, black, [9, 0.9, 0.4], [x, y, 7.3]);
-  box(root, metal, [11, 4, 3], [x > 0 ? x - 9 : x + 9, y, -1]);
+/** One grapple arm: three folding segments, open in the reference, ending in a claw pair. */
+function grapple_arm(root: THREE.Group, side: number): void {
+  const shoulder = [side * 5.5, at(0.05), 0];
+  const elbow = [side * 10.5, at(0.10), 0];
+  const wrist = [side * 12.4, at(0.15), 0];
+  const tip = [side * 10.2, at(0.185), 0];
+  cylinder(root, copper, 1.1, 1.1, 1.6, shoulder, 12);
+  strut(root, frame, shoulder, elbow, 0.85, 10);
+  cylinder(root, copper, 0.9, 0.9, 1.4, elbow, 10);
+  strut(root, frame, elbow, wrist, 0.7, 10);
+  cylinder(root, copper, 0.7, 0.7, 1.1, wrist, 10);
+  // Claw pair, open: two dark talons splayed from the wrist knuckle.
+  strut(root, dark, wrist, [tip[0] - side * 1.4, tip[1], 0.6], 0.5, 8);
+  strut(root, dark, wrist, [tip[0] - side * 1.4, tip[1], -0.6], 0.5, 8);
+  strut(root, dark, wrist, [tip[0] + side * 0.6, tip[1] - 0.4, 0], 0.5, 8);
 }
 
 export function build(): THREE.Object3D {
   const group = new THREE.Group(); group.name = 'mule';
-  const flames: THREE.Mesh[] = [], rcs: THREE.Mesh[] = [];
+  const flames: THREE.Mesh[] = [];
 
-  // ---- the load-bearing chassis the collider was fitted to (envelope verbatim) ------------------
-  hull(group, 28, 78, 10, dark, 0, -1, 0);
+  // ---- towing end: grapple arms and the yoke between them (0.00-0.16) -----------------------------
+  for (const side of [-1, 1]) grapple_arm(group, side);
+  // Yoke: centre bar with a tow roller and hook, gibbeted between the arm roots.
+  box(group, dark, [2 * 0.30 * HW, 2.2, 2.2], [0, at(0.10), 0]);
+  cylinder(group, metal, 1.0, 1.0, 5.6, [0, at(0.10), 0], 12);
+  box(group, copper, [1.1, 1.6, 1.1], [0, at(0.135), 0]);
+
+  // ---- cab (0.16-0.26): faceted command block with segmented glass ----------------------------------
+  plate(group, [
+    [-3.6, at(0.16)], [3.6, at(0.16)], [5.33, at(0.21)], [5.33, at(0.26)],
+    [-5.33, at(0.26)], [-5.33, at(0.21)],
+  ], 7.5, -1.2, armor);
+  // Segmented canopy: three glass panes in a frame, facing forward-down like the sheet.
+  box(group, glass, [7.6, 0.4, 3.0], [0, at(0.175), 2.6]);
+  for (const x of [-2.6, 0, 2.6]) box(group, frame, [0.5, 0.5, 3.2], [x, at(0.175), 2.6]);
+  box(group, teal, [10.9, 0.7, 0.3], [0, at(0.24), 5.6]);
+  box(group, ochre, [10.9, 0.55, 0.3], [0, at(0.225), 5.6]);
+
+  // ---- open rail chassis (0.26-0.80): two rails, structure visible through it -------------------------
+  const railFore = at(0.26), railAft = at(0.80), railX = 0.35 * HW;
   for (const side of [-1, 1]) {
-    // Chassis rail: the same 3 x 66 x 4 beam, bevelled and tied into the spine by ribs.
-    bevelled(group, metal, [3, 66, 4], [side * 15, -5, 0], [0, 0, 0], { radius: 0.5, segments: 1 });
-    for (let i = 0; i < 4; i++) strut(group, frame, [side * 13.4, -33 + i * 19, 0], [side * 4.6, -33 + i * 19, 0], 0.5, 6);
-    for (let i = 0; i < 3; i++) freight_pod(group, side * 24, -24 + i * 21);
-    hull(group, 13, 22, 5, lightArmor, side * 18, 30, 2);
-    for (let i = 0; i < 4; i++) box(group, black, [3.4, 1.6, 0.5], [side * 19.5, -12 + i * 6, 7.2]);
-    drive(group, side * 10, -38, 5.9, flames);
-    drive(group, side * 25, -37, 4.1, flames);
-    bell(group, side * 10, -38, 5.9, 16, true);
-    bell(group, side * 25, -37, 4.1, 14, false);
-    // Coolant run down the rail, and the brace back to the main bell's gimbal.
-    strut(group, copper, [side * 16.6, -30, 3.6], [side * 16.6, 28, 3.6], 0.34, 6);
-    strut(group, frame, [side * 15.4, -30, 0], [side * 10, -28, 0], 0.6, 6);
+    box(group, dark, [1.5, railFore - railAft, 2.2], [side * railX, (railFore + railAft) / 2, 0]);
+  }
+  for (let i = 0; i < 8; i++) {
+    const y = railFore - (i + 0.5) * ((railFore - railAft) / 8);
+    box(group, frame, [2 * railX, 0.8, 1.4], [0, y, 0]);
+  }
+  // Keel tank and pipe run between the rails: the structure you see through the chassis.
+  tube(group, metal, 1.5, 1.5, railFore - railAft - 6, [0, (railFore + railAft) / 2, -2.4], 12);
+  tube(group, copper, 0.5, 0.5, railFore - railAft - 6, [1.9, (railFore + railAft) / 2, -2.4], 8);
+
+  // ---- cargo pods, three per side (0.32, 0.48, 0.64 at +/-0.80) --------------------------------------
+  for (const side of [-1, 1]) for (const f of [0.32, 0.48, 0.64]) {
+    const x = side * 0.80 * HW, y = at(f);
+    bevelled(group, lightArmor, [4.4, 6.6, 5.2], [x, y, 0], [0, 0, 0], { radius: 0.4, segments: 1 });
+    // Clamp arms to the rails: the pod hangs off the chassis, not through it.
+    strut(group, frame, [x - side * 2.2, y + 2.2, 0], [side * railX, y + 2.2, 0], 0.5, 8);
+    strut(group, frame, [x - side * 2.2, y - 2.2, 0], [side * railX, y - 2.2, 0], 0.5, 8);
+    // Identity stripes: teal and ochre bands like the sheet's pods.
+    box(group, teal, [0.3, 5.4, 4.4], [x + side * 2.2, y, 0]);
+    box(group, ochre, [0.3, 5.4, 0.9], [x + side * 2.2, y + 1.6, 0]);
+    box(group, dark, [3.6, 0.5, 4.2], [x, y, 2.8]);
   }
 
-  // ---- command and bow --------------------------------------------------------------------------
-  // The old bridge box becomes a rounded block over the same footprint, and the glazing becomes a
-  // smooth blister instead of a flat pane.
-  lathe(group, hullPaint, [[0, -11], [7.4, -9.6], [10.4, -4], [11, 3], [10, 8.6], [6.4, 10.6], [0, 11.6]], 20, [0, 24, 9]);
-  lathe(group, canopy, [[0, -5.4], [3.0, -4.7], [4.4, -1.8], [4.4, 1.8], [3.0, 4.7], [0, 5.4]], 16, [0, 29, 13.4]);
-  for (const x of [-5, 5]) box(group, dark, [0.9, 5, 2.2], [x, 29, 14.5]);
-  bevelled(group, ochre, [12, 34, 3], [0, -12, 7], [0, 0, 0], { radius: 0.6, segments: 1 });
-  for (let i = 0; i < 5; i++) box(group, dark, [9, 2, 0.6], [0, -22 + i * 4.6, 9]);
-  // Tow yoke: a tug's whole job is the thing on its nose.
-  strut(group, frame, [-9, 36, -1], [0, 46, -1], 0.7, 6);
-  strut(group, frame, [9, 36, -1], [0, 46, -1], 0.7, 6);
-  lathe(group, copper, [[1.4, 0], [1.4, 3], [0.9, 4.4]], 12, [0, 46, -1]);
-  // hp.tow marks the yoke's throat, where a future tow constraint attaches.
-  hp(group, 'tow', [0, 47.2, -1]);
+  // ---- dorsal turret (0.30, centreline) ------------------------------------------------------------------
+  torus(group, frame, 1.05, 0.3, [0, at(0.30), DECK + 0.4], [Math.PI / 2, 0, 0], 8, 20);
+  cylinder(group, dark, 0.95, 1.05, 0.7, [0, at(0.30), DECK + 0.1], 20);
+  hp(group, 'pdc.dorsal', [0, at(0.30), DECK + 0.5]);
 
-  // ---- panel relief -----------------------------------------------------------------------------
+  // ---- radiator panels (0.62-0.80, +/-0.55), deployed ------------------------------------------------------
   for (const side of [-1, 1]) {
-    panel_relief(group, frame, [16, 60, 0.5], [side * 15.7, -3, 0], [0, side * Math.PI / 2, 0], { cols: 2, rows: 4, thickness: 0.6, depth: 0.5 });
-  }
-  panel_relief(group, dark, [18, 18, 0.5], [0, 24, 20.4], [0, 0, 0], { cols: 3, rows: 3, thickness: 0.6, depth: 0.5 });
-
-  // ---- RCS: the four quad positions the sim lights ----------------------------------------------
-  thrusters(group, 32, 24, -24, rcs);
-  for (const side of [-1, 1]) for (const y of [24, -24]) {
-    strut(group, metal, [side * 28.4, y, 2], [side * 31.6, y, 2], 0.5, 6);
+    const x = side * 0.55 * HW;
+    // Hinge root and actuator at the deck.
+    cylinder(group, copper, 0.55, 0.55, 2.2, [x, at(0.66), DECK - 0.4], 10);
+    box(group, dark, [6.0, 3.0, 0.4], [x + side * 1.3, at(0.71), DECK + 2.6]);
+    for (let i = -1; i <= 1; i++) box(group, frame, [0.5, 3.0, 0.55], [x + side * 1.3 + i * 1.9, at(0.71), DECK + 2.6]);
   }
 
-  // ---- landing legs, under the rail feet --------------------------------------------------------
-  for (const side of [-1, 1]) for (const y of [-30, 20]) leg(group, side * 14.0, y, side);
+  // ---- drive bells, 2x2 square cluster (0.80-1.00): asset 11's proportions, scaled ---------------------
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = sx * 0.20 * HW, z = sz * 2.5;
+    lathe(group, metal, [
+      [1.30, 0.00], [1.20, 0.65], [1.02, 1.72], [0.90, 2.80], [0.80, 3.70],
+      [0.74, 4.60], [0.72, 5.20], [0.86, 5.50],
+    ], 18, [x, at(1.0), z]);
+    torus(group, copper, 1.32, 0.14, [x, at(1.0) + 0.06, z], [Math.PI / 2, 0, 0], 8, 20);
+    effect_cone(group, flames, { name: 'flame', radius: 1.25, length: 14.0,
+      pos: [x, at(1.0) - 7.6, z] });
+  }
+  // Stern frame the cluster bolts to.
+  box(group, frame, [2 * 0.20 * HW + 3.4, 2.0, 7.4], [0, at(0.815), 0]);
 
-  // ---- berths -----------------------------------------------------------------------------------
-  // Aft mouth of the exposed frame, between the four bells: where a tug takes a tow or a barge.
-  dock(group, 'A', [0, -44, 0], Math.PI, 'L');
-  torus(group, frame, 7.0, 0.5, [0, -40.0, 0], [Math.PI / 2, 0, 0], 6, 12);
-  strut(group, metal, [-9.4, -40, 2], [9.4, -40, 2], 0.6, 6);
-  // Forward berth at the tow yoke, normal +Y.
-  dock(group, 'fwd', [0, 48, -1], 0, 'S');
+  // ---- RCS corners: cab shoulders forward, drive frame abaft ------------------------------------------------
+  for (const side of [-1, 1]) for (const [y, z] of [[at(0.20), 2.0], [at(0.86), 0.0]]) {
+    const x = side * (y > 0 ? 8.2 : 5.2);
+    box(group, dark, [1.3, 1.3, 1.3], [x, y, z]);
+    effect_cone(group, flames, { name: 'rcs-jet', radius: 0.55, length: 4.5, pos: [x + side * 3.1, y, z], rot: [0, 0, -side * Math.PI / 2] });
+  }
 
-  for (const side of [-1, 1]) {
-    const port = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.4, 10), glass);
-    port.position.set(side * 4.5, 26.5, 19.2); port.rotation.x = Math.PI / 2; group.add(port);
+  // ---- berth: the tug docks stern-first through the drive frame ------------------------------------------------
+  dock(group, 'A', [0, at(1.0), 0], Math.PI, 'M');
+
+  // ---- landing legs under the rails --------------------------------------------------------------------------
+  for (const side of [-1, 1]) for (const f of [0.40, 0.60]) {
+    strut(group, metal, [side * railX, at(f), -1.4], [side * (railX + 1.8), at(f) - 0.9, -DECK - 2.6], 0.4, 8);
+    box(group, dark, [2.4, 1.7, 0.5], [side * (railX + 1.8), at(f) - 0.9, -DECK - 2.8]);
+  }
+
+  // ---- panel relief on the pods' outboard faces ------------------------------------------------------------------
+  for (const side of [-1, 1]) for (const f of [0.32, 0.48, 0.64]) {
+    panel_relief(group, armor, [4.2, 6.2, 0.4], [side * (0.80 * HW + 2.3), at(f), 0], [0, 0, 0], { cols: 2, rows: 3, thickness: 0.5, depth: 0.4 });
   }
   return group;
-}
-
-/** A heavier two-stage leg than the corvette's, sized for the freight loads the tug carries. */
-function leg(root: THREE.Object3D, x: number, y: number, side: number): void {
-  const hip = [x, y, -4.8];
-  const knee = [x + side * 3.2, y - 1.4, -9.4];
-  const foot = [x + side * 1.6, y - 0.6, -14.2];
-  bevelled(root, dark, [4.2, 5.0, 3.0], hip, [0, 0, 0], { radius: 0.5, segments: 1 });
-  strut(root, metal, hip, knee, 1.25, 8);
-  strut(root, metal, knee, foot, 1.0, 8);
-  strut(root, copper, [hip[0], hip[1] - 1.8, hip[2] + 0.6], [knee[0] - side * 0.8, knee[1] + 0.6, knee[2] + 1.0], 0.45, 6);
-  lathe(root, dark, [[1.8, 0.2], [3.0, 0], [3.2, -0.6], [2.8, -1.2]], 12, [foot[0], foot[1], foot[2]]);
 }
 
 export const maps: Maps = (() => {
@@ -152,4 +169,6 @@ export const maps: Maps = (() => {
   };
 })();
 
-export const meta = { name: 'mule', scale: 1.3, collider: { halfLength: 65, halfWidth: 43 } };
+// The plan's own collider table (s2.2): the spine box is the authored reference; the sidecar's
+// compound shapes are derived from the geometry and are what the sim collides on.
+export const meta = { name: 'mule', scale: 1.3, collider: { halfLength: 29, halfWidth: 11.85 } };

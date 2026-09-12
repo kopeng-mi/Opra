@@ -16,8 +16,8 @@
 // Axes as always: nose +Y, dorsal +Z, starboard +X, metres.
 import * as THREE from 'three';
 import {
-  copper, dark, frame, insulation, lightArmor, metal, solarCell,
-  bevelled, box, dish, each_tile, effect_cone, hazard_stripes, hp, lathe,
+  copper, dark, frame, insulation, lightArmor, metal, ochre, solarCell, teal,
+  box, dish, each_tile, effect_cone, hazard_stripes, hp, lathe,
   standard_maps, stencil_text, strut, torus, tube, type Maps,
 } from './prims';
 
@@ -40,25 +40,34 @@ export function build(): THREE.Object3D {
   const effects: THREE.Mesh[] = [];
   const deployed = hp(group, 'unfolded', [0, 0, 0]);
 
-  // Bus: a boxed core, a raised dorsal equipment deck, a ventral deck the folded state stows
-  // against, and frame rails along both flanks.
-  bevelled(deployed, lightArmor, [2.6, 3.4, 2.8], [0, 0, 0], [0, 0, 0], { radius: 0.3, segments: 1 });
-  box(deployed, metal, [2.1, 2.8, 0.36], [0, 0, 1.56]);
-  box(deployed, dark, [2.3, 3.0, 0.3], [0, 0, -1.56]);
+  // Bus: a 2.0 m octagonal core, a dorsal equipment deck, a ventral deck the folded state
+  // stows against, and frame rails along both flanks. The teal/ochre band is the fleet marking.
+  tube(deployed, lightArmor, 1.15, 1.15, 2.0, [0, 0, 0], 8);
+  tube(deployed, teal, 1.17, 1.17, 0.3, [0, 0.25, 0], 8);
+  tube(deployed, ochre, 1.17, 1.17, 0.15, [0, 0.0, 0], 8);
+  box(deployed, metal, [1.6, 1.6, 0.28], [0, 0, 1.2]);
+  box(deployed, dark, [1.7, 1.7, 0.24], [0, 0, -1.2]);
   for (const side of [-1, 1]) {
-    strut(deployed, frame, [side * 1.36, -1.5, 1.2], [side * 1.36, 1.5, 1.2], 0.11, 5);
-    strut(deployed, frame, [side * 1.36, -1.5, -1.2], [side * 1.36, 1.5, -1.2], 0.11, 5);
+    strut(deployed, frame, [side * 1.1, -0.9, 0.95], [side * 1.1, 0.9, 0.95], 0.09, 5);
+    strut(deployed, frame, [side * 1.1, -0.9, -0.95], [side * 1.1, 0.9, -0.95], 0.09, 5);
     // Radiator blades under the ventral deck: the relay dissipates what its transmitter makes.
-    box(deployed, dark, [0.14, 2.6, 1.2], [side * 1.5, 0, -2.35]);
+    box(deployed, dark, [0.12, 1.6, 0.9], [side * 1.2, 0, -1.85]);
   }
-  // Kick motor and its plume: the relay is delivered to its slot, then deploys.
-  lathe(deployed, metal, [[0.5, -1.7], [0.62, -2.6], [0.52, -3.4]], 14);
-  tube(deployed, dark, 0.3, 0.5, 0.5, [0, -3.7, 0], 12);
-  effect_cone(deployed, effects, { name: 'kick', radius: 0.34, length: 1.5, pos: [0, -3.95, 0] });
-  // Antennas: a whip pair off the dorsal deck and a wide-beam horn on each shoulder.
+  // Kick motors: three bells in a triangle under the bus — the relay is delivered to its slot,
+  // then deploys. One plume for the cluster.
+  for (let i = 0; i < 3; i++) {
+    const angle = (i / 3) * Math.PI * 2 + Math.PI / 6;
+    const bx = Math.cos(angle) * 0.5, bz = Math.sin(angle) * 0.5;
+    lathe(deployed, metal, [[0.16, -1.0], [0.2, -1.3], [0.16, -1.55]], 10, [bx, 0, bz]);
+    tube(deployed, dark, 0.1, 0.16, 0.18, [bx, -1.62, bz], 8);
+  }
+  effect_cone(deployed, effects, { name: 'kick', radius: 0.4, length: 1.6, pos: [0, -1.7, 0] });
+  // Whip antenna off the dorsal deck, tall and thin the way the sheet draws it, and a
+  // wide-beam horn on each shoulder.
+  strut(deployed, copper, [0.9, 1.0, 0.9], [0.9, 4.4, 0.9], 0.035, 4);
+  tube(deployed, dark, 0.06, 0.06, 0.3, [0.9, 4.5, 0.9], 6);
   for (const side of [-1, 1]) {
-    strut(deployed, copper, [side * 0.85, 1.4, 1.7], [side * 1.15, 2.7, 2.2], 0.06, 5);
-    tube(deployed, metal, 0.2, 0.3, 0.5, [side * 1.0, 1.05, 2.05], 8, [Math.PI / 2, 0, 0]);
+    tube(deployed, metal, 0.16, 0.24, 0.4, [side * 0.8, 0.85, 1.15], 8, [Math.PI / 2, 0, 0]);
   }
 
   // Solar wings: an A-frame boom pair out of each flank, a hinge drum, two framed panels a side.
@@ -75,19 +84,19 @@ export function build(): THREE.Object3D {
     strut(deployed, metal, [side * 5.95, -1.8, 0.3], [side * 5.95, 1.8, 0.3], 0.08, 4);
   }
 
-  // High-gain dish: boresight dorsal, on a yoke off the deck, so the bus can hold its arrays while
-  // the dish tracks. Rim, tripod feed and horn are the parts that make it read as a dish.
-  dish(deployed, insulation, 1.75, 0.58, [0, 0.3, 3.4], [Math.PI / 2, 0, 0], 12);
-  torus(deployed, metal, 1.7, 0.09, [0, 0.3, 3.98], [0, 0, 0], 5, 10);
-  const focus = [0, 0.3, 3.4 + 0.58 + 1.75 * 0.55];
+  // High-gain dish: top-mounted on a yoke off the dorsal deck, boresight +Y, so the bus can
+  // hold its arrays to the sun while the dish tracks. Rim, tripod feed and horn are the parts
+  // that make it read as a dish.
+  dish(deployed, insulation, 1.05, 0.35, [0, 2.1, 0], [0, 0, 0], 16);
+  torus(deployed, metal, 1.02, 0.06, [0, 2.45, 0], [Math.PI / 2, 0, 0], 5, 16);
+  const focus = [0, 2.1 + 0.35 + 1.05 * 0.55, 0];
   for (let i = 0; i < 3; i++) {
     const angle = (i / 3) * Math.PI * 2 + 0.4;
-    strut(deployed, metal, [Math.cos(angle) * 1.64, 0.3 + Math.sin(angle) * 1.64, 3.98], focus, 0.05, 4);
+    strut(deployed, metal, [Math.cos(angle) * 0.98, 2.45, Math.sin(angle) * 0.98], focus, 0.035, 4);
   }
-  lathe(deployed, copper, [[0.13, 0], [0.13, 0.55]], 8, [focus[0], focus[1], focus[2] - 0.55]);
-  const yoke = [0, 0.3, 3.2];
-  for (const side of [-1, 1]) strut(deployed, metal, [side * 1.15, 0.3, 1.8], [side * 1.0, 0.3, 3.3], 0.13, 5);
-  tube(deployed, dark, 0.3, 0.3, 0.7, yoke, 8);
+  lathe(deployed, copper, [[0.08, 0], [0.08, 0.35]], 8, [focus[0], focus[1] - 0.35, focus[2]]);
+  for (const side of [-1, 1]) strut(deployed, metal, [side * 0.9, 1.1, 0], [side * 0.75, 1.95, 0], 0.09, 5);
+  tube(deployed, dark, 0.22, 0.22, 0.5, [0, 1.25, 0], 8);
 
   // Stowed state, all of it effect-flagged and hidden. Both wings fold flat on the flanks (two
   // plates a side, hinge drum at the root), the dish stows face-up against the ventral deck and the
@@ -111,7 +120,7 @@ export function build(): THREE.Object3D {
     stow(stack);
   }
   const stowed_dish = new THREE.Group(); stowed_dish.name = 'folded-dish';
-  lathe(stowed_dish, insulation, [[1.5, 0], [1.5, 0.22], [0.3, 0.3]], 14, [0, 0, -1.95], [Math.PI / 2, 0, 0]);
+  lathe(stowed_dish, insulation, [[1.0, 0], [1.0, 0.18], [0.2, 0.24]], 14, [0, 0, -1.95], [Math.PI / 2, 0, 0]);
   stowed.add(stowed_dish);
   stow(stowed_dish);
   const stowed_booms = new THREE.Group(); stowed_booms.name = 'folded-booms';

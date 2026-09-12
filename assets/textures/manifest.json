@@ -1,0 +1,101 @@
+{
+  "cinder_albedo": {
+    "layout": "equirect",
+    "size": [
+      2048,
+      1024
+    ],
+    "source": "research/refs/50.png",
+    "srgb": true
+  },
+  "halberd_albedo": {
+    "layout": "equirect",
+    "size": [
+      2048,
+      1024
+    ],
+    "source": "research/refs/55.png",
+    "srgb": true
+  },
+  "nereid_photosphere": {
+    "layout": "tile",
+    "size": [
+      1024,
+      1024
+    ],
+    "source": "research/refs/56.png",
+    "srgb": true
+  },
+  "rock_carbonaceous": {
+    "layout": "tile",
+    "size": [
+      1024,
+      1024
+    ],
+    "source": "research/refs/41.png",
+    "srgb": true
+  },
+  "rock_ore": {
+    "layout": "tile",
+    "size": [
+      1024,
+      1024
+    ],
+    "source": "research/refs/42.png",
+    "srgb": true
+  },
+  "rock_regolith": {
+    "layout": "tile",
+    "size": [
+      1024,
+      1024
+    ],
+    "source": "research/refs/43.png",
+    "srgb": true
+  },
+  "rock_silicate": {
+    "layout": "tile",
+    "size": [
+      1024,
+      1024
+    ],
+    "source": "research/refs/40.png",
+    "srgb": true
+  },
+  "tessera_albedo": {
+    "layout": "equirect",
+    "size": [
+      2048,
+      1024
+    ],
+    "source": "research/refs/51.png",
+    "srgb": true
+  },
+  "tessera_clouds": {
+    "layout": "equirect",
+    "size": [
+      2048,
+      1024
+    ],
+    "source": "research/refs/52.png",
+    "srgb": true
+  },
+  "tessera_night": {
+    "layout": "equirect",
+    "size": [
+      2048,
+      1024
+    ],
+    "source": "research/refs/53.png",
+    "srgb": true
+  },
+  "vesk_albedo": {
+    "layout": "equirect",
+    "size": [
+      2048,
+      1024
+    ],
+    "source": "research/refs/54.png",
+    "srgb": true
+  }
+}

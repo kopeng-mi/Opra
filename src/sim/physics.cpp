@@ -16,7 +16,10 @@ const ShipSpec SHIPS[3] = {
     {"Needle", "Fast reconnaissance cutter", 43000, 1200000, 10000, 2.05, 75, 31, 40, 0.05, 1, 1},
 };
 
-const HullBoxes HULL_BOXES[3] = {{59, 34}, {65, 43}, {62, 27}};
+// The stock boxes, re-authored with the hulls (plan-04 H6): the Kestrel and the Mule are 46 m
+// and 58 m hulls now, and the box is the lit (flames-included) geometry, so the handling and the
+// drawn ship never disagree. The Needle keeps its own until its reference lands (plan-04 H4).
+const HullBoxes HULL_BOXES[3] = {{32.1, 11.8}, {38.8, 13.9}, {62, 27}};
 
 namespace {
 

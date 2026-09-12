@@ -87,6 +87,16 @@ void parse_world_fields(const json &entry, Body &body, const SystemDef &system,
         body.lagrange.dtheta = number(point, "dtheta", path, 0.0, false);
     }
 
+    if (entry.contains("maps")) {
+        // The body's own maps (plan-04 s3.4): names in assets/textures/manifest.json. A body with
+        // none keeps its procedural shading.
+        const json &maps = entry["maps"];
+        body.albedo_map = maps.value("albedo", std::string{});
+        body.cloud_map = maps.value("clouds", std::string{});
+        body.night_map = maps.value("night", std::string{});
+        body.photosphere_map = maps.value("photosphere", std::string{});
+    }
+
     if (entry.contains("surface")) {
         const json &seat = entry["surface"];
         body.surface.present = true;
@@ -135,6 +145,9 @@ SystemDef load_system(const std::string &path) {
     anchor.mu = number(star, "mu", path, 0.0, true);
     anchor.radius = number(star, "radius", path, 0.0, true);
     anchor.soi = 0.0;  // the root: everything is inside it by definition
+    if (star.contains("maps")) {
+        anchor.photosphere_map = star["maps"].value("photosphere", std::string{});
+    }
     system.bodies.push_back(anchor);
 
     if (!root.contains("bodies") || !root["bodies"].is_array()) {

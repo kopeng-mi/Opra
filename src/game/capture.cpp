@@ -5,8 +5,10 @@
 #include <vector>
 
 #include "core/log.h"
-#include "game/config.h"
-#include "gpu/gpu.h"
+#include "game/settings.h"
+#include "render/camera.h"
+#include "render/orrery.h"
+#include "sim/system.h"
 #include "render/renderer.h"
 
 namespace opra {
@@ -50,6 +52,19 @@ bool save_bmp(const char *path, const Uint8 *rgba, int w, int h) {
 
 
 int run_capture(App &app, const char *path, const char *view, double seconds) {
+    // The golden camera is the project's, not the pilot's: settings.ini carries whatever the last
+    // live session left behind - a look's pitch among it - and a capture that inherits it turns
+    // every flight view into a false diff. Pin the frame-content settings here and never mark
+    // them dirty, so the pilot's own file is untouched on the way out.
+    const Settings defaults;
+    app.settings.camera_pitch = defaults.camera_pitch;
+    app.settings.zoom_default = defaults.zoom_default;
+    app.settings.reduced_motion = defaults.reduced_motion;
+    app.world.ship.assist = defaults.assist;
+    app.pitch = CAMERA_PITCH_DEFAULT;
+    app.zoom = defaults.zoom_default;
+    app.zoom_current = app.zoom;
+
         // The plate is a state, not a separate screen: every capture leaves it revealed, and
         // `--view startup` is the one that stays. The names are the graph's, bar the two the shot
         // script has always used - `help` for the manual, `models` for the viewer - and the two
@@ -76,6 +91,7 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
             app.map_target = 4;  // Halberd: the plan's own example transfer
         }
 
+
         const Uint32 width = 1600, height = 900;
         const opra::FlightInput demo{1.0, 0.28, 0.0, false, false};
         const Real dt = 1.0 / 120.0;
@@ -96,6 +112,41 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
         if (app.screen == ui::Screen::Map || app.screen == ui::Screen::Startup) {
             app.map_frame = orrery_frame_for(app.world, app.true_scale, app.map_target);
             app.camera = active_camera(app, width, height);
+        }
+        if (SDL_strcmp(view, "body") == 0) {
+            app.screen = ui::Screen::Map;
+            // One planet at true scale, filling the chart: the golden that holds the albedo map,
+            // the cloud deck and the night lights all in reach (plan-04 s3.4). Tessera is the one
+            // body that carries all three.
+            const int body = app.world.system.index_of("tessera");
+            const Body &def = app.world.system.bodies[static_cast<size_t>(body)];
+            orrery::Body mark;
+            mark.name = def.name;
+            // The chart's own origin: at the body's real position the true-scale glyph is sub-pixel
+            // against a field that reaches its orbit, so the shot centres the body itself.
+            mark.position = glm::dvec2(0.0);
+            mark.radius = def.radius;
+            // A body with no orbit of its own reads as the system's star in the orrery, and would
+            // be drawn by the star pipeline: the mark carries a circular orbit at its own radius,
+            // which classifies it a planet without pulling its real apoapsis into the field.
+            mark.elements = orbit::Elements{};
+            mark.elements.a = def.radius;
+            mark.color = orrery::ink::VELLUM;
+            mark.terrain_seed = static_cast<float>(def.terrain.seed);
+            mark.terrain_amplitude = static_cast<float>(def.terrain.amplitude);
+            // No air shell in this shot: at true scale the shell's additive glow washes the disc
+            // out (a close-range air pass needs its own tuning, plan 4.4), and the surface itself
+            // is what this golden holds.
+            mark.scale_height = 0.0f;
+            mark.atmosphere_top = 0.0f;
+            mark.albedo_map = def.albedo_map;
+            mark.cloud_map = def.cloud_map;
+            mark.night_map = def.night_map;
+            app.map_frame = orrery::Frame{};
+            app.map_frame.t = app.world.elapsed;
+            app.map_frame.true_scale = true;
+            app.map_frame.ship_position = glm::dvec2(0.0);
+            app.map_frame.bodies.push_back(mark);
         }
         // A moment of mining, so the beam and the fracture path appear in the frame.
         if (SDL_strcmp(view, "cutter") == 0) {
@@ -179,10 +230,12 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
         SDL_ReleaseGPUTransferBuffer(app.renderer.device.handle, transfer);
         SDL_ReleaseGPUTexture(app.renderer.device.handle, target);
         std::printf(
-            "screenshot: %s | view %s | sim %.1fs | hull %.0f fuel %.0f ore %.0f speed %.1f | "
-            "fragments %zu ore %zu | %u instances %u runs %llu tri | submits %d\n",
+            "screenshot: %s | view %s | sim %.1fs | hull %.0f fuel %.0f ore %.0f speed %.1f "
+            "thrust %.2f fxruns %zu | fragments %zu ore %zu | %u instances %u runs %llu tri | "
+            "submits %d\n",
             ok ? path : "FAILED", view, app.world.elapsed, app.world.ship.hull,
             app.world.ship.fuel, app.world.oreHeld, length(app.world.ship.velocity),
+            app.world.ship.thrustLevel, app.renderer.effect_runs.size(),
             app.world.fragments.size(), app.world.ore.size(), app.renderer.instance_count,
             app.renderer.run_count,
             static_cast<unsigned long long>(app.renderer.triangle_count), gpu::submit_count());

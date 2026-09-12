@@ -1,4 +1,4 @@
-# Opra — plan 04: assets, textures, camera feel
+> **Status: complete.** The live plan is [PLAN-05-legibility.md](PLAN-05-legibility.md).
 
 Live plan. [PLAN-01](PLAN.md), [PLAN-02](PLAN-02-system.md) and [PLAN-03](PLAN-03-worlds.md) are
 complete; their decisions bind.

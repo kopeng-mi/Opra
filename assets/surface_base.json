@@ -48,13 +48,21 @@
           0
         ],
         "radius": 22.0101
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          66,
+          46
+        ],
+        "radius": 19.0357
       }
     ],
     "bounds_radius": 127.4059
   },
   "ports": [
     {
-      "id": "padA",
+      "id": "pad.A",
       "pos": [
         0,
         0
@@ -76,7 +84,7 @@
       "class": "L"
     },
     {
-      "id": "padB",
+      "id": "pad.B",
       "pos": [
         66,
         46
@@ -113,7 +121,7 @@
   "stats": {},
   "counts": {
     "meshes": 14,
-    "vertices": 62184,
-    "triangles": 20728
+    "vertices": 66468,
+    "triangles": 22156
   }
 }

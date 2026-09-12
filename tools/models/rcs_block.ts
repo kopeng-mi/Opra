@@ -1,44 +1,54 @@
-// RCS quad block (PLAN-03 §7.1): the four-nozzle reaction-control casting a hull bolts on. Fleet
-// axes as always: nose +Y, dorsal +Z, starboard +X, metres. The pads on the -Z face are the
-// mounting face; the four bells fire out of the corner chamfers, one per quadrant, so one block
-// gives the simulation pitch, yaw and roll authority instead of a pod per axis.
+// RCS quad (plan-04 §2.4, ref 12): a 1.3 m casting with four nozzles in a cross in ONE plane —
+// the gameplay plane (X/Y) — which is exactly right for a 2D plane. The -Z face is the mount;
+// the bells fire ±X and ±Y, so one block gives the simulation pitch, yaw and roll authority.
 //
-// The bells are `jet_nozzle`'s, each with the effect cone it owns: those cones are invisible and
-// flagged `userData.effect`, so the exporter carries them to the sidecar as jet.0..jet.3 for the
-// simulation to light while the thruster fires, and merges nothing but the bells and the casting.
+// The bells are `jet_nozzle`'s, each with the effect cone it owns: those cones are invisible
+// and flagged `userData.effect`, so the exporter carries them to the sidecar as jet.0..jet.3.
 import * as THREE from 'three';
 import {
-  bevelled, box, dark, each_tile, hazard_stripes, jet_nozzle, lightArmor, metal, scorch,
-  standard_maps, stencil_text, tube, type Maps,
+  bevelled, box, copper, dark, each_tile, hazard_stripes, jet_nozzle, lightArmor, metal,
+  scorch, standard_maps, stencil_text, tube, type Maps,
 } from './prims';
 
-/** The four quadrants, starboard-dorsal first, so jet.0..jet.3 walk the block instead of jumping. */
-const QUADRANTS: number[][] = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+/** The four in-plane axes, starboard first, so jet.0..jet.3 walk the cross. */
+const CROSS: { pos: number[]; dir: number[] }[] = [
+  { pos: [0.65, 0, 0], dir: [1, 0, 0] },
+  { pos: [0, 0.65, 0], dir: [0, 1, 0] },
+  { pos: [-0.65, 0, 0], dir: [-1, 0, 0] },
+  { pos: [0, -0.65, 0], dir: [0, -1, 0] },
+];
 
 export function build(): THREE.Object3D {
   const group = new THREE.Group(); group.name = 'rcs_block';
   const effects: THREE.Mesh[] = [];
-  // One housing casting, bevelled: a raw box edge catches a highlight like a prop, and on a fighter
-  // this block sits close enough to camera that the edge is what a pilot actually sees.
-  bevelled(group, metal, [3.6, 3.6, 2.4], [0, 0, 0], [0, 0, 0], { radius: 0.5, segments: 1 });
+  // Housing: one 1.3 m bevelled casting. A raw box edge catches a highlight like a prop, and on
+  // a fighter this block sits close enough to camera that the edge is what a pilot sees.
+  bevelled(group, metal, [1.3, 1.3, 0.9], [0, 0, 0], [0, 0, 0], { radius: 0.18, segments: 1 });
   // Mounting face: a gasket plate and four pads, the only surfaces that touch the hull.
-  box(group, dark, [3.0, 3.0, 0.18], [0, 0, -1.28]);
-  for (const [qx, qy] of QUADRANTS) box(group, lightArmor, [0.95, 0.95, 0.5], [qx * 1.02, qy * 1.02, -1.5]);
-  // Propellant inlet on the dorsal face with a harness clamp over it: a block that reads connected.
-  tube(group, metal, 0.42, 0.42, 1.2, [0, 0, 1.5], 8, [Math.PI / 2, 0, 0]);
-  box(group, dark, [1.6, 0.5, 0.5], [0, 1.4, 1.05]);
-  // Bells on the corner chamfers, one per quadrant, each with its own hidden jet. `jet_nozzle`'s
-  // bell flares toward -direction and its plume leaves the same side, so the outward vector goes in
-  // negated: pass it as-is and the bell opens back into the ship with the plume buried in it.
-  QUADRANTS.forEach(([qx, qy], index) => {
+  box(group, dark, [1.1, 1.1, 0.08], [0, 0, -0.48]);
+  for (const qx of [-1, 1]) for (const qy of [-1, 1])
+    box(group, lightArmor, [0.34, 0.34, 0.18], [qx * 0.37, qy * 0.37, -0.56]);
+  // Propellant inlet on the dorsal edge with a harness clamp: a block that reads connected.
+  tube(group, copper, 0.12, 0.12, 0.4, [0, 0.45, 0.45], 8);
+  box(group, dark, [0.5, 0.18, 0.18], [0, 0.62, 0.35]);
+  // Corner plumbing: copper runs up the four vertical corners feeding the bell bases, with a
+  // valve manifold on the aft face — the sheet's pipework, at this scale.
+  for (const qx of [-1, 1]) for (const qy of [-1, 1])
+    tube(group, copper, 0.05, 0.05, 0.8, [qx * 0.6, qy * 0.6, 0], 6);
+  box(group, dark, [0.7, 0.3, 0.2], [0, 0, -0.62]);
+  for (const qx of [-1, 1]) tube(group, metal, 0.07, 0.07, 0.2, [qx * 0.2, 0, -0.66], 6, [Math.PI / 2, 0, 0]);
+  // Bells on the four faces, one per in-plane axis, each with its own hidden jet.
+  CROSS.forEach(({ pos, dir }, index) => {
     jet_nozzle(group, effects, {
       name: `jet.${index}`,
-      radius: 0.42,
-      pos: [qx * 1.82, qy * 1.82, 0],
-      direction: [-qx, -qy, 0],
-      length: 0.9,
+      radius: 0.16,
+      pos,
+      direction: dir,
+      length: 0.35,
     });
   });
+  // Face hatches: one inset panel per free face, perimeter fasteners implied by the maps.
+  box(group, lightArmor, [0.5, 0.5, 0.06], [0, 0, 0.47]);
   return group;
 }
 

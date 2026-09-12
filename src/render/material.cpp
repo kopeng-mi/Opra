@@ -8,7 +8,8 @@ bool Material::operator==(const Material &other) const {
            roughness_factor == other.roughness_factor &&
            base_color_texture == other.base_color_texture &&
            metallic_roughness_texture == other.metallic_roughness_texture &&
-           normal_texture == other.normal_texture && unlit == other.unlit;
+           normal_texture == other.normal_texture && unlit == other.unlit &&
+           triplanar == other.triplanar;
 }
 
 int MaterialTable::add(const Material &material) {

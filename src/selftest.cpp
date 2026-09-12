@@ -34,6 +34,7 @@
 #include "render/gltf.h"
 #include "render/orrery_tests.h"
 #include "render/text_tests.h"
+#include "render/texture.h"
 #include "sim/world.h"
 
 namespace opra {
@@ -496,35 +497,70 @@ void test_camera() {
         check_close(jumped.velocity.x, 0.0, 1.0e-9,
                     "follow: a snap takes the ship's velocity, so the next step is smooth");
 
-        // The hand on the camera (Ctrl and the mouse). Down raises the orbit, sideways slides the
-        // eye, and neither can leave the ranges the settings screen and the frame can hold.
-        float pitch = 0.6f;
+        // The hand on the camera (A4): a grab of the plane, stepped by unprojected world points.
+        // The pan is the anchor minus the cursor, so the grabbed ground returns to the cursor
+        // exactly - no scale, no clamp between them.
         glm::dvec2 pan{0.0};
-        look_step(pitch, pan, {0.0f, 0.0f}, 1.0f, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX, 100.0);
-        check_close(pitch, 0.6, 1.0e-6, "look: a still mouse leaves the angle alone");
-        check(glm::length(pan) == 0.0, "look: and the eye where it was");
+        const glm::dvec2 anchor{120.0, -40.0};
+        look_step(pan, anchor, anchor);
+        check(glm::length(pan) == 0.0, "look: a cursor still on the anchor moves nothing");
 
-        look_step(pitch, pan, {0.0f, 100.0f}, 1.0f, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX, 100.0);
-        check(pitch > 0.6f, "look: dragging down raises the camera above the plane");
-        for (int i = 0; i < 200; ++i) {
-            look_step(pitch, pan, {0.0f, 100.0f}, 1.0f, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX, 100.0);
-        }
-        check_close(pitch, CAMERA_PITCH_MAX, 1.0e-6, "look: the angle stops at the camera's limit");
-        for (int i = 0; i < 400; ++i) {
-            look_step(pitch, pan, {0.0f, -100.0f}, 1.0f, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX, 100.0);
-        }
-        check_close(pitch, CAMERA_PITCH_MIN, 1.0e-6, "look: and at the other end of it");
+        look_step(pan, anchor, anchor + glm::dvec2(30.0, 0.0));
+        check_close(pan.x, -30.0, 1.0e-12, "look: the pan moves the plane by anchor minus cursor");
+        check(pan.x < 0.0 && pan.y == 0.0,
+              "look: dragging the cursor right slides the view left, as a grab does");
 
-        pan = glm::dvec2(0.0);
-        look_step(pitch, pan, {1000.0f, 0.0f}, 1.0f, CAMERA_PITCH_MIN, CAMERA_PITCH_MAX, 40.0);
-        check_close(glm::length(pan), 40.0, 1.0e-9, "look: the slide stops at the frame's own reach");
-        check(pan.x > 0.0 && pan.y == 0.0, "look: a sideways drag slides the eye, it does not turn it");
 
-        // And it walks back: the pan is a look, never a new home.
+        // And it walks back: the pan is a look, never a new home. exp(-dt/tau) is exact, so two
+        // paths to the same elapsed time must land on the same spot.
         glm::dvec2 easing = pan;
         for (int i = 0; i < 240; ++i) easing = pan_release(easing, 1.0 / 120.0, 0.25);
         check(glm::length(easing) < 40.0 * 1.0e-3, "look: releasing the key eases the eye back");
+
+        glm::dvec2 relaxed = pan, slow = pan;
+        for (int i = 0; i < 30; ++i) relaxed = pan_release(relaxed, 4.0 / 60.0, 0.25);
+        for (int i = 0; i < 120; ++i) slow = pan_release(slow, 1.0 / 60.0, 0.25);
+        check_close(glm::length(relaxed - slow), 0.0, 1.0e-9,
+                    "look: two seconds at 15 Hz eases with two seconds at 60 Hz");
         check(pan_release(pan, 10.0, 0.0) == glm::dvec2(0.0), "look: a zero constant centre means it");
+
+        // Gate 3 (plan-04 s5): the grabbed point stays under the cursor, to within 2 px, at the
+        // pitch extremes the settings can reach and at both zoom ends. This is the test that the
+        // pan is a real unprojection: a flat pixels-to-metres scale is wrong by a different amount
+        // on every screen row under a tilted perspective camera, and the error grows with the drag.
+        {
+            const float width = 1280.0f, height = 720.0f;
+            const glm::vec2 grab{896.0f, 396.0f};  // off centre, so both axes carry the drag
+            for (const float pitch_deg : {17.0f, 45.0f, 88.0f}) {
+                for (const float zoom : {0.6f, 3.0f}) {
+                    Camera cam;
+                    cam.half_height = 340.0f / zoom;
+                    cam.aspect = width / height;
+                    cam.origin = glm::dvec3(0.0);
+                    cam.target = glm::vec3(0.0f);
+                    cam.eye = orbit_eye(cam.half_height, pitch_deg * 0.017453292519943295f);
+
+                    const glm::dvec2 anchor = unproject(cam, grab.x, grab.y, width, height);
+                    glm::dvec2 pan{0.0};
+                    // Four frames of drag: the cursor walks 120 px across and 80 up, and each
+                    // frame's pan is stepped from the anchor against the cursor the way the
+                    // update pass does - the camera having moved is part of the contract.
+                    const glm::vec2 path[4] = {{30.0f, -20.0f}, {70.0f, -50.0f}, {95.0f, -65.0f},
+                                               {120.0f, -80.0f}};
+                    for (const glm::vec2 &step : path) {
+                        const glm::vec2 cursor = grab + step;
+                        const glm::dvec2 now = unproject(cam, cursor.x, cursor.y, width, height);
+                        look_step(pan, anchor, now);
+                        cam.origin = glm::dvec3(pan.x, pan.y, 0.0);
+                        const glm::vec2 screen =
+                            project(view_projection(cam), cam.origin, anchor.x, anchor.y, 0.0f,
+                                    width, height);
+                        check(glm::length(screen - cursor) <= 2.0f,
+                              "look: the grabbed point stays under the cursor");
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -576,8 +612,45 @@ void test_settings() {
     }
 }
 
-}  // namespace
+/**
+ * Gate 2 (plan-04 s5): the sRGB/linear pairing is the one thing a texture pipeline can get wrong
+ * without a visible smoke signal, so the pairing itself is asserted, and the loader is exercised
+ * against the repaired maps the fixer wrote.
+ */
+void test_textures() {
+    check(render::map_format(true) == SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM_SRGB,
+          "texture: a colour map loads through the sRGB transfer");
+    check(render::map_format(false) == SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+          "texture: a data map loads as numbers, untransformed");
 
+    // The device needs the video subsystem up first, as the text tests do.
+    const bool video = SDL_Init(SDL_INIT_VIDEO);
+    check(video, "texture: SDL_Init");
+    if (!video) return;
+
+    SDL_GPUDevice *handle = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_DXIL, false, nullptr);
+    if (!handle) {
+        check(false, "texture: a GPU device is needed to exercise load_texture");
+        SDL_Quit();
+        return;
+    }
+    gpu::Device device;
+    device.handle = handle;
+    const render::LoadedTexture tile =
+        render::load_texture(device, asset_path("assets/textures/nereid_photosphere.png"), true);
+    check(tile.width == 1024 && tile.height == 1024,
+          "texture: the photosphere tile loads at its manifest size");
+    const render::LoadedTexture equirect =
+        render::load_texture(device, asset_path("assets/textures/tessera_albedo.png"), true);
+    check(equirect.width == 2048 && equirect.height == 1024,
+          "texture: the equirect loads two to one");
+    render::destroy_texture(device, tile);
+    render::destroy_texture(device, equirect);
+    SDL_DestroyGPUDevice(handle);
+    SDL_Quit();
+}
+
+}  // namespace
 int run_selftest() {
     std::printf("opra selftest\n");
     test_determinism();
@@ -590,6 +663,7 @@ int run_selftest() {
     test_frame_rate_independence();
     test_camera();
     test_settings();
+    test_textures();
     // Every suite reports through the shared harness, so the shared counters are authoritative; a
     // module that counted without forwarding would show up in its own return only, which is why the
     // two are maxed rather than added: adding them would count every failure twice.

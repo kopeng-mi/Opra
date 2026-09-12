@@ -1,0 +1,102 @@
+{
+  "name": "hull_truss",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -1.27,
+      -2.15,
+      -1.25
+    ],
+    "max": [
+      1.27,
+      2.15,
+      1.25
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -1.27,
+      -2.15,
+      -1.25
+    ],
+    "max": [
+      1.27,
+      2.15,
+      1.25
+    ]
+  },
+  "collider": {
+    "halfLength": 2.15,
+    "halfWidth": 1.27,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          0.84,
+          1.9675
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          -2.045
+        ],
+        "angle": 0,
+        "half": [
+          1.25,
+          0.095
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2.045
+        ],
+        "angle": 0,
+        "half": [
+          1.25,
+          0.095
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          1,
+          0.08
+        ]
+      }
+    ],
+    "bounds_radius": 3.2987
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "hull_truss_normal",
+      "roughness": "hull_truss_roughness",
+      "albedo": "hull_truss_albedo"
+    },
+    "materials": 4
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 4,
+    "vertices": 12528,
+    "triangles": 4176
+  }
+}

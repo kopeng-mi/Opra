@@ -47,6 +47,15 @@ struct SkyBody {
     /** Atmosphere scale height over the radius, and the top of the air; 0 is an airless body. */
     float scale_height = 0.0f;
     float atmosphere_top = 0.0f;
+    /**
+     * The map names this body draws with, from the system file through the orrery frame
+     * (plan-04 s3.4). The renderer resolves them against assets/textures' manifest; empty keeps
+     * the procedural shading.
+     */
+    std::string albedo_map;
+    std::string cloud_map;
+    std::string night_map;
+    std::string photosphere_map;
     BodyKind kind = BodyKind::Planet;
 };
 

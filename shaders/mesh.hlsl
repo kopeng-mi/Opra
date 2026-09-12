@@ -74,6 +74,7 @@ struct VSOut
     float2 uv           : TEXCOORD2;
     float4 color        : TEXCOORD3;
     float3 world_pos    : TEXCOORD4;
+    float3 local_pos    : TEXCOORD5;  // the vertex in its own model frame: the triplanar axes
 };
 
 float3 rotate_quat(float3 v, float4 q)
@@ -103,6 +104,7 @@ VSOut VSMain(VSIn input)
 
     o.uv = input.uv;
     o.world_pos = world;
+    o.local_pos = input.pos;
     return o;
 }
 
@@ -189,6 +191,19 @@ float3 shade_pbr(VSOut input, float3 albedo, float metallic, float roughness,
     return lit + albedo * ambient + rim * ps_tint.rgb;
 }
 
+/** Triplanar base colour (plan-04 H9): the tile wraps in the model frame, at a fixed metres
+ *  span, blended by the normal's axis weights so no face shows a hard seam. */
+float3 triplanar_albedo(float3 local_pos, float3 normal)
+{
+    const float3 p = local_pos / 30.0;
+    const float3 w = abs(normal);
+    const float3 blend = w / max(w.x + w.y + w.z, 1e-4);
+    const float3 xy = base_color_texture.Sample(mesh_sampler, p.xy).rgb;
+    const float3 xz = base_color_texture.Sample(mesh_sampler, p.xz).rgb;
+    const float3 yz = base_color_texture.Sample(mesh_sampler, p.yz).rgb;
+    return blend.z * xy + blend.y * xz + blend.x * yz;
+}
+
 float4 PSMain(VSOut input) : SV_Target
 {
     float3 n = normalize(input.world_normal);
@@ -200,7 +215,13 @@ float4 PSMain(VSOut input) : SV_Target
     float3 b = cross(n, t) * (input.world_tangent.w < 0.0 ? -1.0 : 1.0);
 
     float4 base = base_color;
-    if (texture_flags.x > 0.5) base *= base_color_texture.Sample(mesh_sampler, input.uv);
+    if (texture_flags.x > 0.5)
+    {
+        // Triplanar materials ignore the UV: the rock tiles wrap on displaced geometry whose UVs
+        // would stretch across the craters (plan-04 H9).
+        base *= metallic_roughness.z > 0.5 ? float4(triplanar_albedo(input.local_pos, n), 1.0)
+                                           : base_color_texture.Sample(mesh_sampler, input.uv);
+    }
     float metallic = metallic_roughness.x;
     float roughness = max(metallic_roughness.y, 0.04);
     if (texture_flags.y > 0.5)

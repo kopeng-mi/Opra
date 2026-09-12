@@ -149,6 +149,7 @@ add_executable(Opra
     src/render/orrery.cpp
     src/render/orrery_tests.cpp
     src/render/mesh.cpp
+    src/render/texture.cpp
     src/render/model.cpp
     src/render/renderer.cpp
     src/render/scene.cpp

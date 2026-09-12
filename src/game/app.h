@@ -3,6 +3,8 @@
 #pragma once
 
 #include <string>
+
+#include <optional>
 #include <vector>
 
 #include <SDL3/SDL.h>
@@ -96,10 +98,13 @@ struct App {
     FollowState follow;
     /**
      * The hand on the camera: an offset on the follow point from Ctrl and the mouse, in world
-     * metres. It walks back to nothing when the key is released, so looking around never becomes a
-     * new home (game/camera_follow.h says how it is stepped).
+     * metres (A4). While the key is held, `look_anchor` is the unprojected grab point and the pan
+     * is stepped so the grabbed ground stays under the cursor; release and it walks back to
+     * nothing, so a look is never a new home (game/camera_follow.h says how it is stepped).
      */
     glm::dvec2 camera_pan{0.0};
+    /** The grabbed world point while Ctrl is held: the anchor the pan is stepped from. */
+    std::optional<glm::dvec2> look_anchor;
     bool cinematic = false;
     /** F10: how much HUD is on. Cycled with the density key; the context forces blocks on top. */
     Density density = Density::One;

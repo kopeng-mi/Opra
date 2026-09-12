@@ -3,31 +3,31 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -147,
-      -92.8,
-      -56
+      -107.5,
+      -68,
+      -16
     ],
     "max": [
-      166.8,
-      92.8,
-      56
+      107.5,
+      68,
+      16
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -147,
-      -92.8,
-      -56
+      -107.5,
+      -68,
+      -16
     ],
     "max": [
-      166.8,
-      92.8,
-      56
+      107.5,
+      68,
+      16
     ]
   },
   "collider": {
-    "halfLength": 92.8,
-    "halfWidth": 156.9,
+    "halfLength": 68,
+    "halfWidth": 107.5,
     "shapes": [
       {
         "kind": "circle",
@@ -35,95 +35,59 @@
           0,
           0
         ],
-        "radius": 82.5363
-      },
-      {
-        "kind": "circle",
-        "pos": [
-          0,
-          0
-        ],
-        "radius": 81.922
-      },
-      {
-        "kind": "circle",
-        "pos": [
-          0,
-          0
-        ],
-        "radius": 80.9376
-      },
-      {
-        "kind": "circle",
-        "pos": [
-          0,
-          0
-        ],
-        "radius": 66.137
+        "radius": 66.9362
       },
       {
         "kind": "box",
         "pos": [
-          112,
+          0,
           0
         ],
         "angle": 0,
         "half": [
-          25,
-          45
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          -112,
-          0
-        ],
-        "angle": 0,
-        "half": [
-          25,
-          45
+          95.525,
+          4.2
         ]
       }
     ],
-    "bounds_radius": 166.9079
+    "bounds_radius": 108.0614
   },
   "ports": [
     {
       "id": "A",
       "pos": [
-        0,
-        81
+        100.6,
+        -8
       ],
       "normal": [
-        0,
-        1
-      ],
-      "pos3": [
-        0,
-        81,
-        0
-      ],
-      "normal3": [
-        0,
         1,
         0
       ],
-      "class": "M"
+      "pos3": [
+        100.6,
+        -8,
+        0
+      ],
+      "normal3": [
+        1,
+        0,
+        0
+      ],
+      "class": "L"
     },
     {
       "id": "B",
       "pos": [
-        81,
-        0
+        100.6,
+        8
       ],
       "normal": [
         1,
         0
       ],
       "pos3": [
-        81,
-        0,
+        100.6,
+        8,
         0
       ],
       "normal3": [
@@ -131,43 +95,21 @@
         0,
         0
       ],
-      "class": "M"
+      "class": "L"
     },
     {
       "id": "C",
       "pos": [
-        0,
-        -81
-      ],
-      "normal": [
-        0,
-        -1
-      ],
-      "pos3": [
-        0,
-        -81,
-        0
-      ],
-      "normal3": [
-        0,
-        -1,
-        0
-      ],
-      "class": "M"
-    },
-    {
-      "id": "D",
-      "pos": [
-        -81,
-        0
+        -100.6,
+        -8
       ],
       "normal": [
         -1,
         0
       ],
       "pos3": [
-        -81,
-        0,
+        -100.6,
+        -8,
         0
       ],
       "normal3": [
@@ -178,22 +120,22 @@
       "class": "L"
     },
     {
-      "id": "E",
+      "id": "D",
       "pos": [
-        155,
-        0
+        -100.6,
+        8
       ],
       "normal": [
-        1,
+        -1,
         0
       ],
       "pos3": [
-        155,
-        0,
-        -12
+        -100.6,
+        8,
+        0
       ],
       "normal3": [
-        1,
+        -1,
         0,
         0
       ],
@@ -210,12 +152,12 @@
       "roughness": "station_roughness",
       "albedo": "station_albedo"
     },
-    "materials": 12
+    "materials": 10
   },
   "stats": {},
   "counts": {
-    "meshes": 17,
-    "vertices": 59910,
-    "triangles": 19970
+    "meshes": 14,
+    "vertices": 69876,
+    "triangles": 23292
   }
 }

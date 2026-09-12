@@ -23,6 +23,12 @@ struct Material {
     /** KHR_materials_unlit: the exporter marks glows and flames with it, and those are drawn by the
      *  additive pipelines, which never read the material at all. */
     bool unlit = false;
+    /**
+     * Sample the base colour by triplanar coordinates of the vertex's own position instead of its
+     * UV: the rock tiles (plan-04 H9) wrap on procedurally displaced geometry that has no UVs
+     * worth the name, and a UV atlas on a displaced icosphere would stretch across the craters.
+     */
+    bool triplanar = false;
 
     bool operator==(const Material &other) const;
 };

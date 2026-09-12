@@ -3,107 +3,108 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -6.692,
-      -12,
-      -6.2731
+      -1.3552,
+      -2.15,
+      -1.41
     ],
     "max": [
-      8.06,
-      11.6,
-      6.8
+      1.3552,
+      2.15,
+      1.72
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -6.692,
-      -12,
-      -6.2731
+      -1.3552,
+      -2.15,
+      -1.41
     ],
     "max": [
-      8.06,
-      11.6,
-      6.8
+      1.3552,
+      2.15,
+      1.72
     ]
   },
   "collider": {
-    "halfLength": 11.8,
-    "halfWidth": 7.376,
+    "halfLength": 2.15,
+    "halfWidth": 1.355,
     "shapes": [
       {
         "kind": "box",
         "pos": [
           0,
-          -0.4
-        ],
-        "angle": 0,
-        "half": [
-          5.9389,
-          11.6
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          6.35,
           0
         ],
         "angle": 0,
         "half": [
-          1.55,
-          2.4
+          1.25,
+          2.14
         ]
       },
       {
         "kind": "box",
         "pos": [
           0,
-          -7.2
+          0.2
         ],
         "angle": 0,
         "half": [
-          6.15,
-          0.45
+          0.55,
+          0.75
         ]
       },
       {
         "kind": "box",
         "pos": [
           0,
-          7.2
+          0.2
         ],
         "angle": 0,
         "half": [
-          6.15,
-          0.45
+          0.425,
+          0.6
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.75
+        ],
+        "angle": 0,
+        "half": [
+          1.28,
+          0.17
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          -1.35
+        ],
+        "angle": 0,
+        "half": [
+          1.31,
+          0.11
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.35
+        ],
+        "angle": 0,
+        "half": [
+          1.31,
+          0.11
         ]
       }
     ],
-    "bounds_radius": 13.432
+    "bounds_radius": 2.6647
   },
-  "ports": [
-    {
-      "id": "side",
-      "pos": [
-        8,
-        0
-      ],
-      "normal": [
-        1,
-        0
-      ],
-      "pos3": [
-        8,
-        0,
-        0
-      ],
-      "normal3": [
-        1,
-        0,
-        0
-      ],
-      "class": "M"
-    }
-  ],
+  "ports": [],
   "effects": [],
   "hardpoints": {},
   "maps": {
@@ -114,12 +115,12 @@
       "roughness": "hab_module_roughness",
       "albedo": "hab_module_albedo"
     },
-    "materials": 7
+    "materials": 6
   },
   "stats": {},
   "counts": {
-    "meshes": 9,
-    "vertices": 7932,
-    "triangles": 2644
+    "meshes": 8,
+    "vertices": 9816,
+    "triangles": 3272
   }
 }

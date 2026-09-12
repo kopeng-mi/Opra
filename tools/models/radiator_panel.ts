@@ -1,65 +1,68 @@
-// Deployable radiator panel (PLAN-03 §7.1, ship components): the hinged wing a ship dumps heat
-// through. Origin on the hinge axis with the barrel running along +X and the panel extending +Y, so
-// stowing and deploying the thing is one rotation of the whole asset about its own root edge.
+// Deployable radiator panel (plan-04 §2.4, ref 14, deployed state): a 6.0 × 3.0 m wing on a
+// hinged root with its actuator. Origin on the hinge axis with the barrel running along +X
+// and the panel extending +Y, so stowing and deploying the thing is one rotation of the whole
+// asset about its own root edge.
 //
-// `hp.hinge` sits at the origin with its +Y along the barrel: the fold the editor is expected to
-// drive is a rotation about the hinge node's local +Y (equivalently the model's +X axis), which
-// swings the panel from lying in the hull's plane to standing off it like a fin. `hp.tip` marks the
-// outboard end, so a second panel or a tie rod can be anchored to the tip without re-measuring.
+// `hp.hinge` sits at the origin with its +Y along the barrel: the fold the editor is expected
+// to drive is a rotation about the hinge node's local +Y (equivalently the model's +X axis).
+// `hp.tip` marks the outboard end, so a second panel or a tie rod can anchor to the tip.
 import * as THREE from 'three';
 import {
   ceramic, copper, dark, frame, insulation, metal,
   box, damage_relief, each_tile, hazard_stripes, hp, standard_maps, stencil_text, strut, tube, type Maps,
 } from './prims';
 
+/** Deployed panel: 3.0 m of hinge, 6.0 m of wing. */
+const SPAN = 3.0;
+const CHORD = 6.0;
+
 export function build(): THREE.Object3D {
   const group = new THREE.Group(); group.name = 'radiator_panel';
+  const root = CHORD / 2 + 0.45;
 
-  // ---- hinge ------------------------------------------------------------------------------------
-  // Barrel, two hull bearings and the arms that carry the panel off it. The barrel is the pivot, so
-  // nothing else may straddle the axis at the origin: the bearings sit outboard of its ends.
-  tube(group, metal, 0.32, 0.32, 3.4, [0, 0, 0], 12, [0, 0, Math.PI / 2]);
-  for (const x of [-1.5, 1.5]) {
-    box(group, dark, [0.7, 1.1, 1.0], [x, 0.35, 0]);
-    box(group, frame, [0.7, 0.5, 0.8], [x, -0.5, 0]);
-    strut(group, metal, [x * 0.6, 0.1, 0], [x, 1.45, 0], 0.26, 6);
+  // Hinge barrel, two hull bearings and the arms that carry the panel off it. The barrel is
+  // the pivot, so nothing else may straddle the axis at the origin.
+  tube(group, metal, 0.24, 0.24, SPAN - 0.4, [0, 0, 0], 12, [0, 0, Math.PI / 2]);
+  for (const x of [-SPAN / 2 + 0.2, SPAN / 2 - 0.2]) {
+    box(group, dark, [0.5, 0.8, 0.75], [x, 0.25, 0]);
+    box(group, frame, [0.5, 0.35, 0.6], [x, -0.4, 0]);
+    strut(group, metal, [x * 0.6, 0.1, 0], [x, 1.1, 0], 0.18, 6);
   }
-  // Actuator between the hull fitting and the panel root: off the fold axis, so folding changes its
-  // length, which is the whole reason it is there instead of a fixed brace.
-  box(group, frame, [0.8, 0.4, 0.6], [-1.3, -0.3, 0]);
-  strut(group, metal, [-1.3, -0.3, 0], [-0.9, 1.6, 0], 0.11, 5);
-  tube(group, ceramic, 0.2, 0.2, 1.4, [-1.156, 0.386, 0], 8, [0, 0, -0.2075]);
-  box(group, frame, [0.7, 0.5, 0.5], [-0.9, 1.7, 0]);
+  // Actuator between the hull fitting and the panel root: off the fold axis, so folding
+  // changes its length — the whole reason it is there instead of a fixed brace.
+  box(group, frame, [0.55, 0.3, 0.45], [-SPAN / 2 + 0.2, -0.25, 0]);
+  strut(group, metal, [-SPAN / 2 + 0.2, -0.25, 0], [-SPAN / 2 + 0.55, 1.25, 0], 0.08, 5);
+  tube(group, ceramic, 0.14, 0.14, 1.0, [-SPAN / 2 + 0.375, 0.5, 0], 8, [0, 0, -0.26]);
+  box(group, frame, [0.5, 0.35, 0.35], [-SPAN / 2 + 0.55, 1.3, 0]);
 
-  // ---- panel ------------------------------------------------------------------------------------
-  // Two faces on a spine and a rim of edge rails: radiator area is the point of the asset, so the
-  // faces are wide, flat and unbroken, and the panel stays thin enough to read as a wing.
-  box(group, dark, [3.6, 0.9, 1.0], [0, 1.2, 0]);
-  box(group, metal, [1.0, 5.6, 0.7], [0, 4.9, 0]);
-  for (const z of [-0.4, 0.4]) {
-    box(group, insulation, [3.4, 5.6, 0.2], [0, 4.9, z]);
+  // Panel: two faces on a spine with edge rails. Radiator area is the point of the asset, so
+  // the faces are wide, flat and unbroken, and the wing stays thin enough to read as a wing.
+  box(group, dark, [SPAN - 0.3, 0.7, 0.8], [0, 0.9, 0]);
+  box(group, metal, [0.8, CHORD - 0.6, 0.55], [0, root, 0]);
+  for (const z of [-0.32, 0.32]) {
+    box(group, insulation, [SPAN - 0.4, CHORD - 0.6, 0.14], [0, root, z]);
   }
-  // Coolant tube runs: two per face, with a header crossing at each end.
-  for (const z of [-0.52, 0.52]) {
-    for (const x of [-1.1, 1.1]) tube(group, copper, 0.13, 0.13, 5.4, [x, 4.9, z], 8);
-    for (const y of [2.1, 7.7]) tube(group, copper, 0.16, 0.16, 3.4, [0, y, z], 8, [0, 0, Math.PI / 2]);
+  // Coolant runs: two per face with a header crossing at each end.
+  for (const z of [-0.42, 0.42]) {
+    for (const x of [-SPAN / 2 + 0.45, SPAN / 2 - 0.45])
+      tube(group, copper, 0.09, 0.09, CHORD - 0.8, [x, root, z], 8);
+    for (const y of [root - CHORD / 2 + 0.5, root + CHORD / 2 - 0.5])
+      tube(group, copper, 0.11, 0.11, SPAN - 0.5, [0, y, z], 8, [0, 0, Math.PI / 2]);
   }
-  // Edge rails and the outboard end beam.
-  for (const x of [-1.78, 1.78]) box(group, dark, [0.25, 5.7, 0.9], [x, 4.9, 0]);
-  box(group, dark, [3.8, 0.25, 0.9], [0, 2.05, 0]);
-  box(group, frame, [3.9, 0.6, 1.0], [0, 7.9, 0]);
-  // Latch lugs on the end beam: what holds the wing down while it is stowed.
-  for (const x of [-1.4, 1.4]) box(group, metal, [0.5, 0.4, 0.4], [x, 8.3, 0]);
+  // Edge rails, outboard end beam and the latch lugs that hold the wing down while stowed.
+  for (const x of [-SPAN / 2 + 0.06, SPAN / 2 - 0.06]) box(group, dark, [0.18, CHORD - 0.5, 0.7], [x, root, 0]);
+  box(group, dark, [SPAN - 0.2, 0.2, 0.7], [0, root - CHORD / 2 + 0.35, 0]);
+  box(group, frame, [SPAN - 0.1, 0.45, 0.75], [0, root + CHORD / 2 - 0.2, 0]);
+  for (const x of [-1.0, 1.0]) box(group, metal, [0.35, 0.3, 0.3], [x, root + CHORD / 2 + 0.05, 0]);
 
-  // ---- anchors ----------------------------------------------------------------------------------
   // Barrel axis: the deploy fold is a rotation about this node's local +Y.
   hp(group, 'hinge', [0, 0, 0], [0, 0, -Math.PI / 2]);
-  hp(group, 'tip', [0, 8.35, 0]);
+  hp(group, 'tip', [0, root + CHORD / 2 + 0.1, 0]);
   return group;
 }
 
-/** Panel lines coarse enough to survive the planar projection, a hinge-end hazard band, and the
- *  stencils a ground crew needs before it vents a hundred square metres of coolant. */
+/** Panel lines coarse enough to survive the planar projection, a hinge-end hazard band, and
+ *  the stencils a ground crew needs before it vents a hundred square metres of coolant. */
 export const maps: Maps = (() => {
   const kit = standard_maps({
     seed: 67, panel: 0.055, rivets: 0.03, seams: 2, wear: 0.26, grime: 0.16,
@@ -72,7 +75,6 @@ export const maps: Maps = (() => {
     albedo: (ctx, size) => {
       kit.albedo?.(ctx, size);
       each_tile(ctx, size, (tile) => {
-        // The one warning that matters on a radiator, plus the crew stand-off marks at the hinge.
         stencil_text(tile, 'HOT', { x: 0.56, y: 0.3, scale: 0.028 });
         stencil_text(tile, 'STAND CLEAR', { x: 0.2, y: 0.56, scale: 0.017 });
         hazard_stripes(tile, { x: 0.06, y: 0.44, w: 0.32, h: 0.09 }, { pitch: 0.04, angle: Math.PI / 4 });

@@ -7,8 +7,8 @@
 // normal map, so the damage reads from any angle the atlas can see.
 import * as THREE from 'three';
 import {
-  armor, black, dark, frame, lightArmor, metal, box, bevelled, each_tile, hull, lathe, noise, noise_wash, rng,
-  scorch, standard_maps, strut, tube, type Maps,
+  armor, black, copper, dark, frame, glass, lightArmor, metal, ochre, teal, box, bevelled, each_tile, hull, lathe, noise, noise_wash, rng,
+  scorch, standard_maps, strut, torus, tube, type Maps,
 } from './prims';
 
 /** The wreck's own two materials: bare rusted plate and plate cooked black. Both are mapped, so the
@@ -67,6 +67,12 @@ export function build(): THREE.Object3D {
   hull(group, 28, 34, 14, dark, 0, 51, 1);
   hull(group, 20, 30, 11, armor, 0, 52, 8.5);
   torn_plate(group, armor, [14, 18, 1.2], [12, 52, 6], [0, 0, 0.35], 211, 1.1);
+  // Identity bands on the intact bow deck, teal aft of ochre — the marking the sheet draws.
+  box(group, teal, [18, 3.0, 0.3], [0, 44, 14.1]);
+  box(group, ochre, [18, 1.2, 0.3], [0, 41.4, 14.1]);
+  // Bow windows: a lit strip across the upper deck front, dark where the panes are blown.
+  box(group, glass, [10, 1.2, 0.4], [-3, 66.5, 10.5], 0.0);
+  box(group, black, [3.5, 1.2, 0.45], [4, 66.5, 10.5], 0.0);
   // The dorsal pylon is snapped off at its root: the stump is left, and the struts that guyed it.
   box(group, frame, [3.6, 9, 2.2], [0, 62, 12]);
   for (const side of [-1, 1]) strut(group, dark, [0, 64, 12], [side * 4.2, 69, 13.6], 0.32, 6);
@@ -77,6 +83,13 @@ export function build(): THREE.Object3D {
   torn_plate(group, lightArmor, [16, 15, 1.1], [2, 21, 6.5], [0, 0, -0.2], 307, 1.3);
   torn_plate(group, armor, [13, 13, 1.0], [-3, 5, 6.2], [0, 0, 0.5], 401, 1.5);
   for (const x of [-9, -4.5, 4.5, 9]) strut(group, frame, [x, -8, 3], [x * 0.8, 32, 3], 0.55, 5);
+  // Deck beams across the wound with the plating gone between them, and power cables hanging
+  // off the torn edges into the opening — interior you fly past, not a texture.
+  for (const y of [22, 10, -2]) {
+    box(group, dark, [19, 1.0, 1.0], [0, y, 4.5]);
+    strut(group, copper, [-8, y, 4.0], [-6, y - 4, -1.0], 0.12, 4);
+    strut(group, copper, [8, y, 4.0], [6.5, y - 5, -1.5], 0.12, 4);
+  }
   for (const y of [27, 15, 3, -9]) {
     strut(group, frame, [-11, y, -3], [-8, y, 5.5], 0.5, 6);
     strut(group, frame, [11, y, -3], [8, y, 5.5], 0.5, 6);
@@ -101,6 +114,22 @@ export function build(): THREE.Object3D {
   for (const [y, width, material] of [[-12, 21, metal], [-24, 19, black], [-37, 20, metal], [-52, 17, dark], [-64, 14, rust]] as [number, number, THREE.Material][]) {
     box(group, material, [width, 1.2, 2.2], [0, y, 7.6]);
   }
+  // The second drive, sheared: a torn gimbal ring and mount stubs reaching for a bell that is
+  // no longer there. One drive left, one gone — the sheet's own asymmetry.
+  torus(group, dark, 4.6, 0.7, [7, -76, 0], [0.2, 0, 0.1], 5, 14);
+  for (const side of [-1, 1]) strut(group, dark, [7 + side * 4, -73, side * 3], [7 + side * 7, -79, side * 4], 0.55, 6);
+  box(group, frame, [3.0, 4.0, 2.0], [7, -71, 0]);
+  // Hanging radiator: torn off its root hinge, held by two cables, dangling below the aft
+  // section with its coolant pipes exposed.
+  const rad = new THREE.Group();
+  rad.position.set(10, -48, -8);
+  rad.rotation.set(0.5, 0, 0.9);
+  group.add(rad);
+  box(rad, dark, [11, 0.5, 7], [0, 0, 0]);
+  box(rad, frame, [11.5, 0.8, 0.6], [0, 0, 3.4]);
+  for (const x of [-3, 3]) tube(rad, copper, 0.12, 0.12, 6.4, [x, 0.4, 0], 6);
+  strut(group, dark, [6, -42, -2], [8, -48, -7], 0.09, 4);
+  strut(group, dark, [13, -43, -3], [12, -48, -7], 0.09, 4);
 
   // The drive bell, sheared off its mount: the lathe mouth is recessed irregularly along the rim, so
   // the bell was ripped rather than unbolted, and only the stubs of its mount still touch the hull.

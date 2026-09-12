@@ -39,22 +39,13 @@ void follow_snap(FollowState &state, const glm::dvec2 &ship, const glm::dvec2 &s
     state.velocity = ship_velocity;
 }
 
-void look_step(float &pitch, glm::dvec2 &pan, const glm::vec2 &delta_px, float metres_per_px,
-               double pitch_min, double pitch_max, double pan_limit) {
-    // Down is positive in both: dragging the world down raises the camera, which is the gesture a
-    // turntable has used for as long as there have been turntables.
-    pitch = static_cast<float>(std::clamp(
-        static_cast<double>(pitch) + static_cast<double>(delta_px.y) * 0.005, pitch_min, pitch_max));
-    pan.x += static_cast<double>(delta_px.x) * metres_per_px;
-    pan.y -= static_cast<double>(delta_px.y) * metres_per_px;
-    const double reach = glm::length(pan);
-    if (reach > pan_limit) pan *= pan_limit / reach;
+void look_step(glm::dvec2 &pan, const glm::dvec2 &anchor_world, const glm::dvec2 &cursor_world) {
+    pan += anchor_world - cursor_world;
 }
 
 glm::dvec2 pan_release(const glm::dvec2 &pan, Real dt, double tau) {
     if (tau <= 0.0) return glm::dvec2(0.0);
-    const double rate = 1.0 / (1.0 + static_cast<double>(dt) / tau);
-    return pan * rate;
+    return pan * std::exp(-static_cast<double>(dt) / tau);
 }
 
 glm::dvec2 follow_step(FollowState &state, const glm::dvec2 &ship, const glm::dvec2 &ship_velocity,

@@ -76,7 +76,9 @@ int digit_grid(TTF_Font *font) {
     return widest;
 }
 
-/** PLAN-02 §4.3, written out: ASCII only, which is every string this UI draws today. */
+/** PLAN-02 §4.3, written out: ASCII only, which is every string this UI draws today. `grid` is
+ *  the readout's widest digit advance; 0 leaves the digits proportional, which is what the other
+ *  faces draw (A5). */
 float expected_width(TTF_Font *font, const char *text, int grid) {
     float pen = 0.0f;
     uint32_t previous = 0;
@@ -90,13 +92,21 @@ float expected_width(TTF_Font *font, const char *text, int grid) {
                 pen += static_cast<float>(kerning);
             }
         }
-        pen += static_cast<float>(is_digit(codepoint) ? grid : advance);
+        pen += static_cast<float>(is_digit(codepoint) && grid > 0 ? grid : advance);
         previous = codepoint;
     }
     return pen;
 }
 
-/** The grid every digit is laid on, per (face, size), read through the public API. */
+/** One glyph's own advance, for the faces that keep their digits proportional. */
+int glyph_advance(TTF_Font *font, uint32_t codepoint) {
+    int min_x = 0, max_x = 0, min_y = 0, max_y = 0, advance = 0;
+    TTF_GetGlyphMetrics(font, codepoint, &min_x, &max_x, &min_y, &max_y, &advance);
+    return advance;
+}
+
+/** The readout grid (A5): readouts lay digits on the widest advance, the other faces keep their
+ *  own. Both are measured through the public API against the plan's own rule. */
 void test_digit_grid(TextEngine &engine) {
     for (const FaceCase &test : kCases) {
         const std::string path = asset_path(test.path);
@@ -107,17 +117,25 @@ void test_digit_grid(TextEngine &engine) {
         }
         const int grid = digit_grid(font);
         check(grid > 0, "text: the widest digit has an advance");
+        const int used = test.face == TextFace::Readout ? grid : 0;
 
         // The plan's own acceptance case (§4.3): a value counting 199 -> 200 must not move.
         const float zeros = engine.measure(draw_of(test.face, test.px, "0000"));
         const float ones = engine.measure(draw_of(test.face, test.px, "1111"));
-        check(zeros == ones, "text: 0000 and 1111 measure the same");
-        check_close(zeros, 4.0 * grid, 1e-6, "text: four digits are four grid advances");
-
-        const float one_nine_nine = engine.measure(draw_of(test.face, test.px, "199"));
-        const float two_hundred = engine.measure(draw_of(test.face, test.px, "200"));
-        check(one_nine_nine == two_hundred, "text: 199 and 200 measure the same");
-        check_close(one_nine_nine, 3.0 * grid, 1e-6, "text: three digits are three grid advances");
+        if (used > 0) {
+            check(zeros == ones, "text: 0000 and 1111 measure the same");
+            check_close(zeros, 4.0 * grid, 1e-6, "text: four digits are four grid advances");
+            const float one_nine_nine = engine.measure(draw_of(test.face, test.px, "199"));
+            const float two_hundred = engine.measure(draw_of(test.face, test.px, "200"));
+            check(one_nine_nine == two_hundred, "text: 199 and 200 measure the same");
+            check_close(one_nine_nine, 3.0 * grid, 1e-6,
+                        "text: three digits are three grid advances");
+        } else {
+            check_close(zeros, 4.0 * glyph_advance(font, '0'), 1e-6,
+                        "text: display digits keep their own advance");
+            check_close(ones, 4.0 * glyph_advance(font, '1'), 1e-6,
+                        "text: as do ones");
+        }
 
         const float four = engine.measure(draw_of(test.face, test.px, "1999"));
         const float five = engine.measure(draw_of(test.face, test.px, "19999"));
@@ -127,11 +145,12 @@ void test_digit_grid(TextEngine &engine) {
         // advances, nothing double-counted at the joins.
         const char *mixed = "31.7 m/s";
         check_close(engine.measure(draw_of(test.face, test.px, mixed)),
-                    expected_width(font, mixed, grid), 1e-4, "text: digits and letters mix");
+                    expected_width(font, mixed, used), 1e-4, "text: digits and letters mix");
         // A string with no digits is untouched by the grid.
         const char *plain = "Kestrel";
         check_close(engine.measure(draw_of(test.face, test.px, plain)),
-                    expected_width(font, plain, grid), 1e-4, "text: a non-digit string keeps its advances");
+                    expected_width(font, plain, used), 1e-4,
+                    "text: a non-digit string keeps its advances");
 
         TTF_CloseFont(font);
     }
@@ -243,6 +262,23 @@ void test_build_bookkeeping() {
     TTF_CloseFont(readout);
     check_close(engine.measure(draw_of(TextFace::Readout, 20.0f, "1111")), 4.0 * grid, 1e-6,
                 "text: the grid places what the grid measures");
+
+    // Gate 5 (plan-04 s5): "31.7" renders as four glyphs at every readout size - the reported
+    // failure dropped the final digit when the x-sort could not recover the walk. The split never
+    // reconciles, so every codepoint with ink draws.
+    for (const float size : {25.0f, 20.0f, 16.0f, 13.0f}) {
+        std::vector<TextDraw> speed_text;
+        TextDraw speed = draw_of(TextFace::Readout, size, "31.7");
+        speed.at = {100.0f, 100.0f};
+        speed_text.push_back(speed);
+        std::vector<UIVertex> speed_vertices(3);
+        std::vector<uint32_t> speed_indices{0, 1, 2};
+        std::vector<TextRun> speed_runs;
+        engine.build(speed_text, speed_vertices, speed_indices, speed_runs);
+        check(speed_vertices.size() == 3 + 16, "text: 31.7 draws as four glyphs");
+        check(speed_runs.size() >= 1 && speed_indices.size() > 3,
+              "text: and it lands in the frame's runs");
+    }
 
     engine.destroy(device);
     SDL_DestroyGPUDevice(handle);

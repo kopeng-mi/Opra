@@ -26,12 +26,9 @@ inline constexpr double FOLLOW_TAU = 0.5;
 /** Past this separation the follow snaps instead of springing: a reset, a warp jump, a handoff. */
 inline constexpr double FOLLOW_SNAP = 640.0;
 
-// The hand on the camera: Ctrl and the mouse. The pitch range is the settings screen's own, so a
-// value dragged here is the value that comes back from the file. The pan is a look, not a move: it
-// reaches half a frame and walks back the moment the key is let go.
-inline constexpr float LOOK_PITCH_MIN_DEG = 17.0f;
-inline constexpr float LOOK_PITCH_MAX_DEG = 88.0f;
-inline constexpr double LOOK_PAN_FRACTION = 0.5;   // of the frame's half-height
+// The hand on the camera (A4): Ctrl and the mouse, a grab of the plane, stepped by unprojected
+// world points. There is no magnitude clamp - the release walks the pan back; the pitch is not a
+// look control at all.
 inline constexpr double LOOK_RELEASE_TAU = 0.25;   // seconds back to centre
 
 // Rendering. 4x MSAA: low-poly silhouettes on a near-black field alias badly. 1 disables it.

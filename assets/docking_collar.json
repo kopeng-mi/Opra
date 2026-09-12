@@ -3,31 +3,31 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -3.5097,
-      -3.6,
-      -1
+      -2,
+      -2,
+      -0.595
     ],
     "max": [
-      3.5097,
-      3.85,
-      1.0512
+      2,
+      2.2,
+      0.9529
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -3.5097,
-      -3.6,
-      -1
+      -2,
+      -2,
+      -0.9
     ],
     "max": [
-      3.5097,
-      3.85,
-      1.0512
+      2,
+      2.2,
+      2.1
     ]
   },
   "collider": {
-    "halfLength": 3.725,
-    "halfWidth": 3.51,
+    "halfLength": 2.1,
+    "halfWidth": 2,
     "shapes": [
       {
         "kind": "circle",
@@ -35,7 +35,7 @@
           0,
           0
         ],
-        "radius": 3.6
+        "radius": 1.9754
       },
       {
         "kind": "circle",
@@ -43,7 +43,7 @@
           0,
           0
         ],
-        "radius": 3.2
+        "radius": 1.9359
       },
       {
         "kind": "circle",
@@ -51,10 +51,10 @@
           0,
           0
         ],
-        "radius": 1.5983
+        "radius": 1.0494
       }
     ],
-    "bounds_radius": 3.8599
+    "bounds_radius": 2.2204
   },
   "ports": [
     {
@@ -70,7 +70,7 @@
       "pos3": [
         0,
         0,
-        0.95
+        0.55
       ],
       "normal3": [
         0,
@@ -80,7 +80,16 @@
       "class": "M"
     }
   ],
-  "effects": [],
+  "effects": [
+    {
+      "node": "capture",
+      "pos": [
+        0,
+        0,
+        0.6
+      ]
+    }
+  ],
   "hardpoints": {},
   "maps": {
     "size": 512,
@@ -90,12 +99,12 @@
       "roughness": "docking_collar_roughness",
       "albedo": "docking_collar_albedo"
     },
-    "materials": 5
+    "materials": 6
   },
   "stats": {},
   "counts": {
-    "meshes": 6,
-    "vertices": 1716,
-    "triangles": 572
+    "meshes": 9,
+    "vertices": 2786,
+    "triangles": 932
   }
 }

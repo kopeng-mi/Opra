@@ -147,6 +147,10 @@ void build(SceneBuilder &scene, const Meshes &meshes, const Frame &frame) {
         sky.terrain_amplitude = body.terrain_amplitude;
         sky.scale_height = body.scale_height;
         sky.atmosphere_top = body.atmosphere_top;
+        sky.albedo_map = body.albedo_map;
+        sky.cloud_map = body.cloud_map;
+        sky.night_map = body.night_map;
+        sky.photosphere_map = body.photosphere_map;
         sky.kind = star ? BodyKind::Star : BodyKind::Planet;
         scene.bodies.push_back(sky);
     }

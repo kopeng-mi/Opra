@@ -82,6 +82,15 @@ struct Body {
     LagrangeSeat lagrange;
     /** A base on one of this body's pads (G16). */
     SurfaceSeat surface;
+    /**
+     * The map names this body draws with, as entries of assets/textures/manifest.json
+     * (plan-04 s3.4). Empty means the body keeps its procedural shading. Albedo, clouds and
+     * night are equirectangular maps; the star carries a tiled photosphere instead.
+     */
+    std::string albedo_map;
+    std::string cloud_map;
+    std::string night_map;
+    std::string photosphere_map;
 };
 
 struct Belt {

@@ -21,10 +21,12 @@ inline const glm::vec4 PLATE{0.055f, 0.078f, 0.106f, 1.0f};  // #0e141b
 inline const glm::vec4 ETCH{0.863f, 0.902f, 0.910f, 1.0f};  // #dce6e8
 /** Warm ivory: chart ink, ephemeris figures, orrery rings. */
 inline const glm::vec4 VELLUM{0.902f, 0.863f, 0.784f, 1.0f};  // #e6dcc8
-/** Teal: navigation, contacts, things that are where they should be. */
-inline const glm::vec4 NAV{0.514f, 0.725f, 0.710f, 1.0f};  // #83b9b5
-/** Amber: propulsion, energy, the active transfer. */
-inline const glm::vec4 DRIVE{0.937f, 0.722f, 0.475f, 1.0f};  // #efb879
+/** Teal: navigation, contacts, things that are where they should be. The hue is the hulls'
+ *  observed teal band (plan-04 A2: #275459) at ink lightness, so a nav mark and the ship's own
+ *  band read as one family. */
+inline const glm::vec4 NAV{0.510f, 0.725f, 0.729f, 1.0f};  // #82b9ba
+/** Amber: propulsion, energy, the active transfer. The observed ochre band's hue (#ae7040). */
+inline const glm::vec4 DRIVE{0.933f, 0.722f, 0.478f, 1.0f};  // #eeb87a
 /** Coral: out of tolerance, and nothing else. */
 inline const glm::vec4 THREAT{0.875f, 0.510f, 0.467f, 1.0f};  // #df8277
 

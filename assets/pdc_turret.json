@@ -1,0 +1,95 @@
+{
+  "name": "pdc_turret",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -1.5,
+      -1.5,
+      0
+    ],
+    "max": [
+      1.5,
+      2.6097,
+      2.4721
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -1.5,
+      -1.5,
+      0
+    ],
+    "max": [
+      1.5,
+      3.7141,
+      2.955
+    ]
+  },
+  "collider": {
+    "halfLength": 2.055,
+    "halfWidth": 1.5,
+    "shapes": [
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 1.4872
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 1.3979
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0.15
+        ],
+        "radius": 0.55
+      }
+    ],
+    "bounds_radius": 2.6336
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "flash.0",
+      "pos": [
+        -0.32,
+        2.5752,
+        2.2885
+      ]
+    },
+    {
+      "node": "flash.1",
+      "pos": [
+        0.32,
+        2.5752,
+        2.2885
+      ]
+    }
+  ],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "pdc_turret_normal",
+      "roughness": "pdc_turret_roughness",
+      "albedo": "pdc_turret_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 8,
+    "vertices": 3892,
+    "triangles": 1304
+  }
+}

@@ -6,6 +6,7 @@
     "sdl3-ttf",
     "glm",
     "cgltf",
-    "nlohmann-json"
+    "nlohmann-json",
+    "stb"
   ]
 }

@@ -44,19 +44,21 @@ void follow_snap(FollowState &state, const glm::dvec2 &ship, const glm::dvec2 &s
                  const FollowParams &params);
 
 /**
- * One step of a hand on the camera: Ctrl and the mouse. Vertical movement raises and lowers the
- * orbit (the pitch is the camera's own angle above the play plane), horizontal movement slides the
- * eye sideways and along the plane without turning it - yaw stays locked to world north, which is
- * what keeps the collar's bearing frame honest. `metres_per_px` is the frame's own scale, so a drag
- * across the screen moves the eye across the same distance whatever the zoom.
+ * One grab step of the hand on the camera (A4): Ctrl and the mouse, a grab of the plane itself.
+ * `anchor_world` is the world point unprojected under the cursor when Ctrl went down;
+ * `cursor_world` is the same unprojection for where the cursor sits now. The pan moves by their
+ * difference, so after the step the anchor is back under the cursor - exactly, at any pitch and any
+ * zoom, because the projection does the work instead of a pixels-to-metres scale that is only true
+ * on one screen row. There is deliberately no magnitude clamp: the release's ease back (below) is
+ * what keeps a look a look, and a clamp mid-drag would tear the ground off the cursor.
  *
  * The pan is an offset on the follow point, not a change to it: release the key and `pan_release`
- * walks it back, so a look is a look and never a new home.
+ * walks it back, so a look is a look and never a new home. Pitch is not in this API at all - it is
+ * read from settings once, at camera construction (F1).
  */
-void look_step(float &pitch, glm::dvec2 &pan, const glm::vec2 &delta_px, float metres_per_px,
-               double pitch_min, double pitch_max, double pan_limit);
+void look_step(glm::dvec2 &pan, const glm::dvec2 &anchor_world, const glm::dvec2 &cursor_world);
 
-/** The pan eased back to nothing once the pilot lets go of the look key. */
+/** The pan eased back to nothing once the pilot lets go: exact exp(-dt/tau), frame-rate clean. */
 glm::dvec2 pan_release(const glm::dvec2 &pan, Real dt, double tau);
 
 /** One step of the follow. Returns the new centre; `state` is updated in place. */

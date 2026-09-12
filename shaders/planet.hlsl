@@ -25,6 +25,7 @@ cbuffer BodyUniforms : register(b0, space1)
     float4 star_color;      // rgb
     float4 viewport;        // xy pixels, z star pixel radius, w this body's pixel radius
     float4 eye_position;    // xyz the camera eye
+    float4 maps;            // x albedo, y clouds, z night, w unused
 };
 
 cbuffer BodyUniformsPS : register(b0, space3)
@@ -38,7 +39,15 @@ cbuffer BodyUniformsPS : register(b0, space3)
     float4 ps_star_color;
     float4 ps_viewport;
     float4 ps_eye_position;
+    float4 ps_maps;
 };
+
+// The body's maps (plan-04 s3.4): albedo first, then the cloud deck and the night lights. The
+// air shell's own fragment stage declares none of these.
+Texture2D    albedo_map : register(t0, space2);
+Texture2D    cloud_map : register(t1, space2);
+Texture2D    night_map : register(t2, space2);
+SamplerState body_sampler : register(s0, space2);
 
 static const float PI = 3.14159265358979;
 /** The drawn air shell never thinner than this share of the radius: Tessera's own air is 1.7% of
@@ -197,6 +206,13 @@ float4 PSMain(VSOut input) : SV_Target
 {
     const float lod = ps_terrain.z;
     const float3 albedo = ps_color.rgb;
+    // The body's equirectangular maps, in the plane's own axes: latitude from z, longitude from
+    // (y, x), so a map's x runs east and its y runs pole to pole (plan-04 s3.4). The sampler
+    // wraps in longitude and clamps at the poles, and the mips carry a dot on the map screen and
+    // a limb on descent from the same 2048-pixel file.
+    const float3 direction = normalize(input.unit);
+    const float2 map_uv = float2(atan2(direction.y, direction.x) / (2.0 * PI) + 0.5,
+                                 0.5 - asin(clamp(direction.z, -1.0, 1.0)) / PI);
 
     if (lod < 0.5)
     {
@@ -216,23 +232,61 @@ float4 PSMain(VSOut input) : SV_Target
     const float wrap = clamp(ps_atmosphere.z * 8.0, 0.01, 0.6);
     const float term = saturate((ndl + wrap) / (1.0 + wrap));
 
+    // The albedo: the body's own map where it has one, the flat tint and procedural grain where
+    // it does not (an airless moon stays shaded the old way). The map is albedo only - the height
+    // the ship lands on stays sim/terrain.cpp's, so the silhouette is never a lie (s3.4).
+    float3 surface = albedo;
+    if (ps_maps.x > 0.5)
+    {
+        surface = albedo_map.Sample(body_sampler, map_uv).rgb;
+    }
+
     if (lod < 1.5)
     {
         // A small sphere: the terminator and a little limb darkening, nothing that would be noise
         // at twenty pixels.
-        float3 lit = albedo * term * ps_star_color.rgb * ps_star_direction.w;
+        float3 lit = surface * term * ps_star_color.rgb * ps_star_direction.w;
         lit *= pow(ndv, 0.45);
-        return float4(lit + albedo * 0.02, 1.0);
+        return float4(lit + surface * 0.02, 1.0);
     }
 
     const uint seed = uint(ps_terrain.x + 0.5);
+    if (ps_maps.x > 0.5)
+    {
+        // The map carries its own texture; the procedural grain would fight it.
+        float3 lit = surface;
+        lit *= term * ps_star_color.rgb * ps_star_direction.w;
+        lit *= pow(ndv, 0.45);
+
+        // The cloud deck: the body's own map, scrolling at a fixed offset rate under the
+        // surface's rotation - a weather layer, not a second body. The map's red channel is the
+        // coverage; the gate keeps it off the poles.
+        if (ps_maps.y > 0.5)
+        {
+            const float drift = ps_terrain.w * 0.0045;
+            const float4 cover = cloud_map.Sample(body_sampler, map_uv - float2(drift, 0.0));
+            const float gate = 0.55 + 0.45 * sin(asin(clamp(direction.z, -1.0, 1.0)) * 3.0);
+            const float clouds = smoothstep(0.30, 0.72, cover.r * gate) * saturate(term * 1.4);
+            lit = lerp(lit, cloud_tint() * term * ps_star_color.rgb * ps_star_direction.w,
+                       clouds * 0.85);
+        }
+
+        // Night lights: the city glow, masked to the dark hemisphere, emissive - added here,
+        // before bloom, so it survives the tonemap (s3.4).
+        if (ps_maps.z > 0.5)
+        {
+            const float night = saturate(-ndl);
+            lit += night_map.Sample(body_sampler, map_uv).rgb * (night * 2.4);
+        }
+        return float4(lit, 1.0);
+    }
+
     float3 lit = albedo * (0.82 + 0.36 * surface_grain(input.world_pos - ps_center_radius.xyz, seed));
     lit *= term * ps_star_color.rgb * ps_star_direction.w;
     lit *= pow(ndv, 0.45);
 
     // Two scrolling FBM bands in a latitude-banded coordinate: the bands are why a cloud deck reads
     // as weather rather than as noise, and the gate keeps them off the poles.
-    const float3 direction = normalize(input.unit);
     const float latitude = asin(clamp(direction.z, -1.0, 1.0));
     const float longitude = atan2(direction.y, direction.x);
     const float2 band = float2(longitude * 2.4, latitude * 6.0);
@@ -278,8 +332,8 @@ float4 PSAir(VSOut input) : SV_Target
 
     const float3 n = normalize(input.world_normal);
     const float sun = saturate(dot(n, normalize(ps_star_direction.xyz)) + 0.35);
-    // Rayleigh-ish weighting: short wavelengths scatter, so the rim is blue and the terminator warms
-    // towards red as the sight line lengthens.
+    // Rayleigh-ish weighting: short wavelengths scatter, so the rim is blue and the terminator
+    // warms towards red as the sight line lengthens.
     const float3 rayleigh = lerp(float3(1.0, 0.45, 0.22), float3(0.32, 0.55, 1.0), saturate(sun));
     const float3 emitted = rayleigh * depth * sun * ps_star_color.rgb * ps_star_direction.w * 9.0;
     return float4(emitted, saturate(depth * 2.0));

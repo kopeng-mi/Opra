@@ -3,14 +3,20 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 
 #include <glm/gtc/matrix_transform.hpp>
+#include <nlohmann/json.hpp>
 
 #include "core/log.h"
 #include "gpu/gpu.h"
 #include "render/mesh.h"
+#include "render/texture.h"
 
 namespace opra {
+
+// The body maps' manifest, read like every other file's json (gltf.cpp, system.cpp).
+using json = nlohmann::json;
 
 namespace {
 
@@ -188,11 +194,12 @@ SDL_GPUGraphicsPipeline *create_shadow_pipeline(SDL_GPUDevice *dev) {
 SDL_GPUGraphicsPipeline *create_body_pipeline(SDL_GPUDevice *dev, Uint32 samples,
                                               const char *vs_path, const char *vs_entry,
                                               const char *ps_path, const char *ps_entry,
-                                              bool additive, bool write_depth) {
+                                              bool additive, bool write_depth,
+                                              Uint32 ps_textures = 0) {
     SDL_GPUShader *vs =
         mesh_shader(dev, vs_path, vs_entry, SDL_GPU_SHADERSTAGE_VERTEX, 1, 0);
     SDL_GPUShader *ps =
-        mesh_shader(dev, ps_path, ps_entry, SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);
+        mesh_shader(dev, ps_path, ps_entry, SDL_GPU_SHADERSTAGE_FRAGMENT, 1, ps_textures);
 
     SDL_GPUVertexBufferDescription buffers[2]{};
     buffers[0].slot = 0;
@@ -481,11 +488,11 @@ const PipelineSet &Renderer::pipelines_for(SDL_GPUTextureFormat format, Uint32 r
     set.effect = create_mesh_pipeline(device.handle, wanted, true, true);
     set.backdrop = create_mesh_pipeline(device.handle, wanted, true, false);
     set.planet = create_body_pipeline(device.handle, wanted, "shaders/planet_vs.dxil", "VSMain",
-                                      "shaders/planet_ps.dxil", "PSMain", false, true);
+                                      "shaders/planet_ps.dxil", "PSMain", false, true, 3);
     set.air = create_body_pipeline(device.handle, wanted, "shaders/planet_vs.dxil", "VSMain",
-                                   "shaders/planet_air_ps.dxil", "PSAir", true, false);
+                                   "shaders/planet_air_ps.dxil", "PSAir", true, false, 0);
     set.star = create_body_pipeline(device.handle, wanted, "shaders/star_vs.dxil", "VSMain",
-                                    "shaders/star_ps.dxil", "PSMain", true, false);
+                                    "shaders/star_ps.dxil", "PSMain", true, false, 1);
     set.shadow = create_shadow_pipeline(device.handle);
     set.bloom_threshold = create_fullscreen_pipeline(
         device.handle, HDR_FORMAT, "shaders/bloom_threshold_ps.dxil", "PSThreshold", 1, false);
@@ -516,6 +523,18 @@ void ensure_depth(Renderer &renderer, Uint32 width, Uint32 height) {
 }
 
 /** Merges every library mesh into one vertex/index pair and records their ranges. */
+/** The four rock tiles, loaded once and always first: the asteroid materials name them 0..3. */
+void load_rock_tiles(Renderer &renderer) {
+    if (!renderer.textures.empty()) return;
+    for (const char *name :
+         {"rock_silicate", "rock_carbonaceous", "rock_ore", "rock_regolith"}) {
+        const render::LoadedTexture loaded =
+            render::load_texture(renderer.device, "assets/textures/" + std::string(name) + ".png",
+                                 true);
+        renderer.textures.push_back(loaded.texture);
+    }
+}
+
 void upload_mesh_library(Renderer &renderer, const opra::MeshLibrary &library) {
     // A hot reload calls this again: the previous buffers must go or they leak.
     if (renderer.mesh_vertices) SDL_ReleaseGPUBuffer(renderer.device.handle, renderer.mesh_vertices);
@@ -532,6 +551,7 @@ void upload_mesh_library(Renderer &renderer, const opra::MeshLibrary &library) {
     vertices.reserve(vertex_total);
     indices.reserve(index_total);
 
+    load_rock_tiles(renderer);
     // Materials are deduplicated across the whole library: a hundred primitives that share one
     // export material share one entry, and the run that binds it is already one draw.
     renderer.materials.clear();
@@ -542,7 +562,18 @@ void upload_mesh_library(Renderer &renderer, const opra::MeshLibrary &library) {
         gpu.first_index = static_cast<Uint32>(indices.size());
         gpu.index_count = static_cast<Uint32>(mesh.indices.size());
         gpu.vertex_offset = static_cast<Sint32>(vertices.size());
-        gpu.material = renderer.materials.add(mesh.material);
+        // The GLB image blobs are never uploaded (the exporter's maps are procedural detail the
+        // draw path does not sample yet), so a model-local texture index names nothing in this
+        // table. Only the triplanar rock materials name real entries (the four tiles load_rock_tiles
+        // puts at 0..3); everything else samples the white texel, exactly as before the tiles
+        // existed - otherwise a hull's slot 0 silently becomes the silicate tile.
+        opra::Material material = mesh.material;
+        if (!material.triplanar) {
+            material.base_color_texture = -1;
+            material.metallic_roughness_texture = -1;
+            material.normal_texture = -1;
+        }
+        gpu.material = renderer.materials.add(material);
         vertices.insert(vertices.end(), mesh.vertices.begin(), mesh.vertices.end());
         // Indices stay local to their mesh: the draw call supplies the base vertex. Widening them
         // here as well applies the offset twice and pushes the last meshes out of the buffer.
@@ -579,6 +610,10 @@ void destroy_renderer(Renderer &renderer) {
     if (r.mesh_indices) SDL_ReleaseGPUBuffer(r.device.handle, r.mesh_indices);
     if (r.mesh_vertices) SDL_ReleaseGPUBuffer(r.device.handle, r.mesh_vertices);
     if (r.white) SDL_ReleaseGPUTexture(r.device.handle, r.white);
+    for (SDL_GPUTexture *texture : r.textures) {
+        SDL_ReleaseGPUTexture(r.device.handle, texture);
+    }
+    r.textures.clear();
     if (r.ui_indices) SDL_ReleaseGPUBuffer(r.device.handle, r.ui_indices);
     if (r.ui_index_transfer) SDL_ReleaseGPUTransferBuffer(r.device.handle, r.ui_index_transfer);
     for (const PipelineSet &set : r.pipelines) {
@@ -674,6 +709,16 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
                 glm::vec4(static_cast<float>(width), static_cast<float>(height), star_pixels,
                           std::max(pixels, 1e-3f));
             draw.uniforms.eye_position = glm::vec4(camera.eye, 1.0f);
+            if (star) {
+                draw.maps[0] = renderer.map_texture(body.photosphere_map);
+                draw.tile = true;
+            } else {
+                draw.maps[0] = renderer.map_texture(body.albedo_map);
+                draw.maps[1] = renderer.map_texture(body.cloud_map);
+                draw.maps[2] = renderer.map_texture(body.night_map);
+            }
+            draw.uniforms.maps = glm::vec4(draw.maps[0] ? 1.0f : 0.0f, draw.maps[1] ? 1.0f : 0.0f,
+                                           draw.maps[2] ? 1.0f : 0.0f, 0.0f);
             draw.mesh = body.mesh;
             draw.shell = shell;
             draw.star = star;
@@ -728,6 +773,24 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
         info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
         renderer.shadow_sampler = SDL_CreateGPUSampler(renderer.device.handle, &info);
         if (!renderer.shadow_sampler) fatal("SDL_CreateGPUSampler (shadow)");
+    }
+    if (!renderer.map_sampler_equirect || !renderer.map_sampler_tile) {
+        // An equirectangular map wraps in longitude and clamps at the poles (a map's top and
+        // bottom edge are the poles, not a tile); a tile wraps in both. Linear with mips, since
+        // the load_texture chains them.
+        SDL_GPUSamplerCreateInfo info{};
+        info.min_filter = SDL_GPU_FILTER_LINEAR;
+        info.mag_filter = SDL_GPU_FILTER_LINEAR;
+        info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+        info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+        info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+        info.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+        renderer.map_sampler_equirect = SDL_CreateGPUSampler(renderer.device.handle, &info);
+        info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
+        renderer.map_sampler_tile = SDL_CreateGPUSampler(renderer.device.handle, &info);
+        if (!renderer.map_sampler_equirect || !renderer.map_sampler_tile) {
+            fatal("SDL_CreateGPUSampler (body maps)");
+        }
     }
 
     // ------------------------------------------------------------------ the star's cascade
@@ -828,12 +891,25 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
         sky_bindings[0] = {renderer.mesh_vertices, 0};
         sky_bindings[1] = {renderer.body_instances.buffer, 0};
         SDL_BindGPUVertexBuffers(pass, 0, sky_bindings, 2);
-        const auto draw_sky = [&](SDL_GPUGraphicsPipeline *pipeline, bool shell, bool star) {
+        const auto draw_sky = [&](SDL_GPUGraphicsPipeline *pipeline, bool shell, bool star,
+                                  Uint32 samplers) {
             int drawn = 0;
             for (size_t i = 0; i < sky_draws.size(); ++i) {
                 if (sky_draws[i].shell != shell || sky_draws[i].star != star) continue;
                 if (drawn == 0) SDL_BindGPUGraphicsPipeline(pass, pipeline);
                 ++drawn;
+                // A body samples the maps its system file named, and the white texel for every
+                // slot it did not, so the shader's flag decides and the sampler is never a hole.
+                if (samplers > 0) {
+                    SDL_GPUTextureSamplerBinding bindings[3]{};
+                    for (Uint32 slot = 0; slot < samplers; ++slot) {
+                        bindings[slot] = {
+                            sky_draws[i].maps[slot] ? sky_draws[i].maps[slot] : renderer.white,
+                            sky_draws[i].tile ? renderer.map_sampler_tile
+                                              : renderer.map_sampler_equirect};
+                    }
+                    SDL_BindGPUFragmentSamplers(pass, 0, bindings, samplers);
+                }
                 SDL_PushGPUVertexUniformData(cmd, 0, &sky_draws[i].uniforms,
                                              sizeof(BodyUniforms));
                 SDL_PushGPUFragmentUniformData(cmd, 0, &sky_draws[i].uniforms,
@@ -843,9 +919,9 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
                                              mesh.vertex_offset, static_cast<Uint32>(i));
             }
         };
-        draw_sky(set.planet, false, false);
-        draw_sky(set.air, true, false);
-        draw_sky(set.star, false, true);
+        draw_sky(set.planet, false, false, 3);
+        draw_sky(set.air, true, false, 0);
+        draw_sky(set.star, false, true, 1);
         SDL_BindGPUVertexBuffers(pass, 0, vertex_bindings, 2);
     }
 
@@ -872,7 +948,8 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
                 MaterialUniforms uniforms{};
                 uniforms.base_color = material.base_color_factor;
                 uniforms.metallic_roughness = glm::vec4(
-                    material.metallic_factor, material.roughness_factor, 0.0f, 0.0f);
+                    material.metallic_factor, material.roughness_factor,
+                    material.triplanar ? 1.0f : 0.0f, 0.0f);
                 uniforms.texture_flags =
                     glm::vec4(base_texture >= 0 ? 1.0f : 0.0f, mr_texture >= 0 ? 1.0f : 0.0f,
                               normal_texture >= 0 ? 1.0f : 0.0f, material.unlit ? 1.0f : 0.0f);
@@ -1024,6 +1101,40 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
         SDL_DrawGPUIndexedPrimitives(hud_pass, run.index_count, 1, run.first_index, 0, 0);
     }
     SDL_EndGPURenderPass(hud_pass);
+}
+
+/**
+ * Resolves a body's map name against assets/textures/manifest.json, which the repair pass wrote
+ * with the maps themselves. The whole manifest loads the first time any name is asked for; an
+ * unknown name is a null texture, so the body keeps its procedural shading (plan-04 s3.4).
+ */
+SDL_GPUTexture *Renderer::map_texture(const std::string &name) {
+    if (name.empty()) return nullptr;
+    if (auto found = body_maps.find(name); found != body_maps.end()) return found->second;
+    if (!body_manifest_read) {
+        body_manifest_read = true;
+        std::ifstream manifest("assets/textures/manifest.json");
+        if (!manifest) SDL_Log("map_texture: the manifest does not open (cwd below the repo?)");
+        if (manifest) {
+            json entries;
+            try {
+                manifest >> entries;
+            } catch (const std::exception &error) {
+                SDL_Log("assets/textures/manifest.json: %s", error.what());
+            }
+            for (auto entry = entries.begin(); entry != entries.end(); ++entry) {
+                if (body_maps.count(entry.key())) continue;
+                const std::string path = "assets/textures/" + entry.key() + ".png";
+                const bool srgb = entry.value().value("srgb", true);
+                const render::LoadedTexture loaded = render::load_texture(device, path, srgb);
+                body_maps[entry.key()] = loaded.texture;
+                body_map_textures.push_back(loaded.texture);
+            }
+        }
+    }
+    if (auto found = body_maps.find(name); found != body_maps.end()) return found->second;
+    SDL_Log("map_texture: %s is not in the manifest", name.c_str());
+    return nullptr;
 }
 
 }  // namespace opra

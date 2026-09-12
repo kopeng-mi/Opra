@@ -3,82 +3,78 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -4.9526,
+      -1.35,
       0,
-      -5.08
+      -1.35
     ],
     "max": [
-      4.9526,
-      8.2,
-      5.08
+      1.35,
+      5.65,
+      1.35
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -4.9526,
-      -26,
-      -5.08
+      -1.35,
+      -7,
+      -1.35
     ],
     "max": [
-      4.9526,
-      8.2,
-      5.08
+      1.35,
+      5.65,
+      1.35
     ]
   },
   "collider": {
-    "halfLength": 4.1,
-    "halfWidth": 4.953,
+    "halfLength": 2.825,
+    "halfWidth": 1.35,
     "shapes": [
       {
         "kind": "box",
         "pos": [
           0,
-          3.625
+          1.65
         ],
         "angle": 0,
         "half": [
-          4.924,
-          3.625
+          1.35,
+          1.65
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          2.68
+        ],
+        "radius": 0.825
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          3.35
+        ],
+        "angle": 0,
+        "half": [
+          0.6045,
+          0.35
         ]
       },
       {
         "kind": "box",
         "pos": [
           0,
-          3.575
+          4.6
         ],
         "angle": 0,
         "half": [
-          4.8,
-          3.325
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          0,
-          5.05
-        ],
-        "angle": 0,
-        "half": [
-          3.72,
-          0.3994
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          0,
-          0.28
-        ],
-        "angle": 0,
-        "half": [
-          4.9526,
-          0.275
+          0.8287,
+          0.25
         ]
       }
     ],
-    "bounds_radius": 9.7395
+    "bounds_radius": 5.7867
   },
   "ports": [],
   "effects": [
@@ -95,7 +91,7 @@
     "mount": {
       "pos": [
         0,
-        8.2,
+        5.6,
         0
       ],
       "rot": [
@@ -127,12 +123,12 @@
       "roughness": "drive_main_roughness",
       "albedo": "drive_main_albedo"
     },
-    "materials": 5
+    "materials": 6
   },
   "stats": {},
   "counts": {
-    "meshes": 7,
-    "vertices": 4478,
-    "triangles": 1496
+    "meshes": 8,
+    "vertices": 10034,
+    "triangles": 3348
   }
 }

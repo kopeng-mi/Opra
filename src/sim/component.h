@@ -13,7 +13,11 @@ namespace opra {
 
 /**
  * One module of a design, placed in the ship's frame: metres, nose +Y, starboard +X, so an `angle`
- * of zero points the part's own nose the same way as the ship's.
+ * of zero points the part's own nose the same way as the ship's. The mount is a flange position
+ * (plan-04 A6): the module's own model carries the s2.5 flange at its attachment face, and the
+ * place to stack a hull module is the previous module's flange one 4 m pitch along, so a design is
+ * a stack of parts that share one bolt pattern. The exporter derives the module's collider and
+ * ports from the same model, so a set that respects the flange pitch never interpenetrates.
  */
 struct Component {
     /** Dotted kind tag. The prefix is the kind: "drive." is a drive, "rcs." a corner jet. */

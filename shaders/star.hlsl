@@ -17,6 +17,7 @@ cbuffer BodyUniforms : register(b0, space1)
     float4 star_color;
     float4 viewport;        // xy pixels, z star pixel radius, w this star's pixel radius
     float4 eye_position;
+    float4 maps;            // x photosphere bound, w unused
 };
 
 cbuffer BodyUniformsPS : register(b0, space3)
@@ -30,8 +31,16 @@ cbuffer BodyUniformsPS : register(b0, space3)
     float4 ps_star_color;
     float4 ps_viewport;
     float4 ps_eye_position;
+    float4 ps_maps;
 };
 
+// The photosphere tile (plan-04 s3.4), sampled in the star's own axes: two wraps in longitude,
+// one span pole to pole, under the limb darkening.
+Texture2D    photosphere_map : register(t0, space2);
+SamplerState star_sampler : register(s0, space2);
+
+/** The corona is drawn out to here, in disc radii: the geometry is scaled to match. */
+static const float PI = 3.14159265358979;
 /** The corona is drawn out to here, in disc radii: the geometry is scaled to match. */
 static const float CORONA = 3.2;
 /** Limb darkening: I(mu) = I0 (1 - u (1 - mu)), the standard Eddington-ish profile. */
@@ -49,6 +58,7 @@ struct VSOut
 {
     float4 clip        : SV_Position;
     float3 world_pos   : TEXCOORD0;
+    float3 unit        : TEXCOORD2;   // the unit-sphere point: the photosphere's own axes
     float4 center_clip : TEXCOORD1;
 };
 
@@ -63,6 +73,7 @@ VSOut VSMain(VSIn input)
     const float3 local = rotate_quat(input.pos * input.i_scale.xyz, input.i_rot);
     const float3 world = local + input.i_pos.xyz;
     o.world_pos = world;
+    o.unit = input.pos;
     o.center_clip = mul(view_proj, float4(center_radius.xyz, 1.0));
     o.clip = mul(view_proj, float4(world, 1.0));
     return o;
@@ -95,6 +106,16 @@ float4 PSMain(VSOut input) : SV_Target
         const float mu = sqrt(saturate(1.0 - r * r));
         const float limb = 1.0 - LIMB_U * (1.0 - mu);
         const float coverage = saturate((1.0 - r) / edge);
+        if (ps_maps.x > 0.5)
+        {
+            // The photosphere's granulation, tiled under the limb: the map carries the surface's
+            // own brightness variation, the analytic profile carries the edge.
+            const float3 unit = normalize(input.unit);
+            const float2 uv = float2(atan2(unit.y, unit.x) / PI + 0.5,
+                                     0.5 - asin(clamp(unit.z, -1.0, 1.0)) / PI);
+            const float3 granule = photosphere_map.Sample(star_sampler, uv).rgb;
+            return float4(tint * limb * (0.72 + 0.56 * granule), coverage);
+        }
         return float4(tint * limb, coverage);
     }
 

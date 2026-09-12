@@ -96,41 +96,40 @@ TextEngine::Slot &TextEngine::slot_for(TextFace face, int px) {
         fatal("TTF_OpenFont");
     }
     slot.ascent = TTF_GetFontAscent(slot.font);
-    // Tabular figures the faces do not ship (PLAN-02 s4.3): every digit takes the widest digit's
-    // advance, so a readout counting through 199 -> 200 keeps its width. Measured per size, from
-    // the same cached glyphs SDL_ttf lays out with, so the grid matches the drawn quads exactly.
+    // Tabular figures the faces do not ship (PLAN-02 s4.3), A5's refinement: the grid belongs to
+    // the Readout face alone, where one draw per character places every digit on it. The other
+    // faces keep their own advances and kerning. Measured per size, from the same cached glyphs
+    // the split sub-draws are laid out with, so the grid and the ink cannot disagree.
     int widest = 0;
-    for (uint32_t digit = '0'; digit <= '9'; ++digit) {
-        int min_x = 0, max_x = 0, min_y = 0, max_y = 0, advance = 0;
-        if (TTF_GetGlyphMetrics(slot.font, digit, &min_x, &max_x, &min_y, &max_y, &advance) &&
-            advance > widest) {
-            widest = advance;
+    if (index == 1) {
+        for (uint32_t digit = '0'; digit <= '9'; ++digit) {
+            int min_x = 0, max_x = 0, min_y = 0, max_y = 0, advance = 0;
+            if (TTF_GetGlyphMetrics(slot.font, digit, &min_x, &max_x, &min_y, &max_y, &advance) &&
+                advance > widest) {
+                widest = advance;
+            }
         }
     }
     slot.digit_advance = widest;
     return slot;
 }
 
-TextEngine::Layout TextEngine::lay_out(const Slot &slot, const std::string &text, bool placement) {
+TextEngine::Layout TextEngine::lay_out(const Slot &slot, const std::string &text,
+                                       std::vector<GlyphCell> *cells) {
     Layout layout;
-    layout.exact = true;
-    if (placement) {
-        layout.placed.reserve(text.size());
-        layout.order.reserve(text.size());
-    }
+    layout.splittable = true;
+    if (cells) cells->clear();
     float pen = 0.0f;
-    float shift = 0.0f;
-    float last_ink_x = 0.0f;
-    bool drew = false;
     uint32_t previous = 0;
     for (size_t i = 0; i < text.size();) {
+        const size_t begin = i;
         const uint32_t codepoint = next_codepoint(text, i);
-        // A second line restarts both the pen and the ascent line, and this walk is one line.
-        if (codepoint == '\n' || codepoint == '\r') layout.exact = false;
+        // A second line restarts both the pen and the ascent line, and a readout is one line.
+        if (codepoint == '\n' || codepoint == '\r') layout.splittable = false;
         int min_x = 0, max_x = 0, min_y = 0, max_y = 0, advance = 0;
         if (!TTF_GetGlyphMetrics(slot.font, codepoint, &min_x, &max_x, &min_y, &max_y, &advance)) {
             // SDL_ttf still draws its .notdef for this codepoint; the walk no longer describes it.
-            layout.exact = false;
+            layout.splittable = false;
         }
         // Kerning, except across a digit: the grid is what keeps the columns in line, and a kerned
         // digit pair would break it as surely as a proportional advance would.
@@ -140,33 +139,23 @@ TextEngine::Layout TextEngine::lay_out(const Slot &slot, const std::string &text
                 pen += static_cast<float>(kerning);
             }
         }
-        const bool gridded = slot.digit_advance > 0 && is_digit(codepoint);
-        if (gridded) layout.digits = true;
-        if (placement) {
+        if (cells) {
             const bool draws = max_x > min_x && max_y > min_y;
-            const float ink_x = pen + static_cast<float>(min_x);
-            // build() recovers the quads' string order by sorting them on ink x, which only holds
-            // while the ink rises with the pen; a glyph that hangs left of its own pen breaks it.
-            if (draws) {
-                if (drew && ink_x <= last_ink_x) layout.exact = false;
-                last_ink_x = ink_x;
-                drew = true;
-            }
-            layout.placed.push_back(Placed{shift, draws});
-            if (draws) layout.order.push_back(static_cast<uint32_t>(layout.placed.size() - 1));
+            cells->push_back(GlyphCell{pen, static_cast<uint32_t>(begin), static_cast<uint32_t>(i),
+                                       draws});
         }
         if (max_y > layout.ink_top) layout.ink_top = max_y;
-        pen += static_cast<float>(gridded ? slot.digit_advance : advance);
-        if (gridded) shift += static_cast<float>(slot.digit_advance - advance);
+        pen += static_cast<float>(slot.digit_advance > 0 && is_digit(codepoint) ? slot.digit_advance
+                                                                               : advance);
         previous = codepoint;
     }
     layout.width = pen;
     return layout;
 }
 
-TTF_Text *TextEngine::text_for(Slot &slot, const std::string &text) {
+TTF_Text *TextEngine::text_for(Slot &slot, std::string_view text) {
     for (CachedText &entry : slot.texts) {
-        if (entry.text == text) {
+        if (std::string_view(entry.text) == text) {
             entry.used = frame_;
             return entry.object;
         }
@@ -178,17 +167,17 @@ TTF_Text *TextEngine::text_for(Slot &slot, const std::string &text) {
         if (entry.used != frame_ && (!reusable || entry.used < reusable->used)) reusable = &entry;
     }
     if (reusable) {
-        if (!TTF_SetTextString(reusable->object, text.c_str(), text.size())) {
+        if (!TTF_SetTextString(reusable->object, text.data(), text.size())) {
             fatal("TTF_SetTextString");
         }
-        reusable->text = text;
+        reusable->text.assign(text.data(), text.size());
         reusable->used = frame_;
         return reusable->object;
     }
     if (live_texts_ >= kMaxTexts) evict_text();
-    TTF_Text *object = TTF_CreateText(engine_, slot.font, text.c_str(), text.size());
+    TTF_Text *object = TTF_CreateText(engine_, slot.font, text.data(), text.size());
     if (!object) fatal("TTF_CreateText");
-    slot.texts.push_back(CachedText{object, text, frame_});
+    slot.texts.push_back(CachedText{object, std::string(text), frame_});
     ++live_texts_;
     return object;
 }
@@ -217,7 +206,45 @@ void TextEngine::evict_text() {
 
 float TextEngine::measure(const TextDraw &draw) {
     if (draw.text.empty()) return 0.0f;
-    return lay_out(slot_for(draw.face, px_of(draw.px)), draw.text, false).width;
+    return lay_out(slot_for(draw.face, px_of(draw.px)), draw.text, nullptr).width;
+}
+
+void TextEngine::append(Slot &slot, std::string_view text, float left, float top,
+                        const glm::vec4 &color, std::vector<UIVertex> &vertices,
+                        std::vector<uint32_t> &indices, std::vector<TextRun> &runs) {
+    TTF_GPUAtlasDrawSequence *sequence = TTF_GetGPUTextDrawData(text_for(slot, text));
+    if (!sequence) return;  // all whitespace: SDL_ttf hands back nothing to draw
+    for (TTF_GPUAtlasDrawSequence *s = sequence; s; s = s->next) {
+        if (!s->atlas_texture || !s->xy || !s->uv || !s->indices) {
+            continue;  // a quad this frame cannot sample: never appended
+        }
+        const uint32_t first_vertex = static_cast<uint32_t>(vertices.size());
+        const uint32_t first_index = static_cast<uint32_t>(indices.size());
+        for (int i = 0; i < s->num_vertices; i += 4) {
+            for (int v = 0; v < 4; ++v) {
+                UIVertex vertex;
+                vertex.pos = glm::vec2(s->xy[i + v].x + left, top - s->xy[i + v].y);
+                vertex.uv = glm::vec2(s->uv[i + v].x, s->uv[i + v].y);
+                vertex.color = color;
+                vertices.push_back(vertex);
+            }
+            const int base = (i / 4) * 6;
+            for (int v = 0; v < 6; ++v) {
+                indices.push_back(first_vertex + static_cast<uint32_t>(s->indices[base + v]));
+            }
+        }
+        if (s->num_indices <= 0) continue;
+        // Two sequences of one string share an atlas only when they are adjacent; a run that
+        // folded them together across a texture switch would draw the wrong glyphs.
+        TextRun *last = runs.empty() ? nullptr : &runs.back();
+        if (last && last->texture == s->atlas_texture &&
+            last->first_index + last->index_count == first_index) {
+            last->index_count += static_cast<uint32_t>(s->num_indices);
+        } else {
+            runs.push_back(
+                TextRun{s->atlas_texture, first_index, static_cast<uint32_t>(s->num_indices)});
+        }
+    }
 }
 
 void TextEngine::build(const std::vector<TextDraw> &texts, std::vector<UIVertex> &vertices,
@@ -228,40 +255,13 @@ void TextEngine::build(const std::vector<TextDraw> &texts, std::vector<UIVertex>
     for (const TextDraw &draw : texts) {
         if (draw.text.empty()) continue;
         Slot &slot = slot_for(draw.face, px_of(draw.px));
-        const Layout layout = lay_out(slot, draw.text, true);
-        TTF_GPUAtlasDrawSequence *sequence = TTF_GetGPUTextDrawData(text_for(slot, draw.text));
-        if (!sequence) continue;  // all whitespace: SDL_ttf hands back nothing to draw
-        int quads = 0;
-        for (TTF_GPUAtlasDrawSequence *s = sequence; s; s = s->next) quads += s->num_vertices / 4;
-        // SDL_ttf drops the quad of a glyph with an empty ink box (a space) and of a clipped one;
-        // when its quad count matches the walk, the two sets describe the same glyphs. A string
-        // without a digit needs none of this: the grid shifts nothing, so it is drawn exactly
-        // where SDL_ttf laid it out.
-        const bool gridded = layout.digits && layout.exact &&
-                             quads == static_cast<int>(layout.order.size());
-        if (gridded) {
-            // SDL_ttf sorts a text's draw operations by atlas before handing them back
-            // (SDL_gpu_textengine.c, "Sort the operations to batch by texture"), so a sequence's
-            // quads are NOT in string order - a 25-character label comes back permuted. The
-            // coordinates are untouched and a left-to-right line's ink x rises with the pen, so
-            // sorting the quads on x recovers the order the walk describes.
-            quad_x_.clear();
-            quad_order_.clear();
-            for (TTF_GPUAtlasDrawSequence *s = sequence; s; s = s->next) {
-                for (int i = 0; i < s->num_vertices; i += 4) {
-                    quad_x_.push_back(s->xy[i].x);
-                    quad_order_.push_back(static_cast<uint32_t>(quad_order_.size()));
-                }
-            }
-            std::sort(quad_order_.begin(), quad_order_.end(), [this](uint32_t a, uint32_t b) {
-                return quad_x_[a] < quad_x_[b];
-            });
-            quad_shift_.assign(quad_order_.size(), 0.0f);
-            for (size_t rank = 0; rank < quad_order_.size(); ++rank) {
-                const Placed &placed = layout.placed[layout.order[rank]];
-                quad_shift_[quad_order_[rank]] = placed.shift;
-            }
-        }
+        // A5: a readout splits into one draw per character, each at the pen the walk computed, so
+        // every digit sits on the grid by construction and SDL_ttf is never asked to reconcile a
+        // long string against itself - the old x-sort of its permuted quads is gone with the bug
+        // it dropped. Labels draw whole and keep their kerning.
+        const Layout layout = lay_out(slot, draw.text,
+                                      draw.face == TextFace::Readout ? &cells_ : nullptr);
+        const bool split = draw.face == TextFace::Readout && layout.splittable && !cells_.empty();
         float left = draw.at.x;
         if (draw.align == TextAlign::Center) {
             left -= layout.width * 0.5f;
@@ -269,43 +269,19 @@ void TextEngine::build(const std::vector<TextDraw> &texts, std::vector<UIVertex>
             left -= layout.width;
         }
         // xy is y-up and its origin is the ascent line, pushed down when the tallest glyph stands
-        // above it: the baseline is at `top` plus the ascent.
+        // above it: the baseline is at `top` plus the ascent. The string's tallest glyph sets that
+        // push once, and every per-character sub-draw of the line shares it.
         const int ystart = std::max(0, layout.ink_top - slot.ascent);
         const float top = draw.at.y - static_cast<float>(ystart);
-        int quad = 0;
-        for (TTF_GPUAtlasDrawSequence *s = sequence; s; s = s->next) {
-            if (!s->atlas_texture || !s->xy || !s->uv || !s->indices) {
-                quad += s->num_vertices / 4;  // a quad this frame cannot sample: never appended
-                continue;
+        if (split) {
+            for (const GlyphCell &cell : cells_) {
+                if (!cell.draws) continue;
+                append(slot,
+                       std::string_view(draw.text).substr(cell.begin, cell.end - cell.begin),
+                       left + cell.pen, top, draw.color, vertices, indices, runs);
             }
-            const uint32_t first_vertex = static_cast<uint32_t>(vertices.size());
-            const uint32_t first_index = static_cast<uint32_t>(indices.size());
-            for (int i = 0; i < s->num_vertices; i += 4, ++quad) {
-                const float dx = left + (gridded ? quad_shift_[static_cast<size_t>(quad)] : 0.0f);
-                for (int v = 0; v < 4; ++v) {
-                    UIVertex vertex;
-                    vertex.pos = glm::vec2(s->xy[i + v].x + dx, top - s->xy[i + v].y);
-                    vertex.uv = glm::vec2(s->uv[i + v].x, s->uv[i + v].y);
-                    vertex.color = draw.color;
-                    vertices.push_back(vertex);
-                }
-                const int base = (i / 4) * 6;
-                for (int v = 0; v < 6; ++v) {
-                    indices.push_back(first_vertex +
-                                      static_cast<uint32_t>(s->indices[base + v]));
-                }
-            }
-            if (s->num_indices <= 0) continue;
-            // Two sequences of one string share an atlas only when they are adjacent; a run that
-            // folded them together across a texture switch would draw the wrong glyphs.
-            TextRun *last = runs.empty() ? nullptr : &runs.back();
-            if (last && last->texture == s->atlas_texture &&
-                last->first_index + last->index_count == first_index) {
-                last->index_count += static_cast<uint32_t>(s->num_indices);
-            } else {
-                runs.push_back(
-                    TextRun{s->atlas_texture, first_index, static_cast<uint32_t>(s->num_indices)});
-            }
+        } else {
+            append(slot, draw.text, left, top, draw.color, vertices, indices, runs);
         }
     }
 }

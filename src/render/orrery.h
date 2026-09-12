@@ -95,6 +95,11 @@ struct Body {
     float terrain_amplitude = 0.0f;
     float scale_height = 0.0f;
     float atmosphere_top = 0.0f;
+    /** The body's map names, straight from the system file (plan-04 s3.4). */
+    std::string albedo_map;
+    std::string cloud_map;
+    std::string night_map;
+    std::string photosphere_map;
 };
 
 /**

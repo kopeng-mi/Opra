@@ -190,7 +190,7 @@ MeshData prism(const std::vector<glm::vec2> &outline_in, float depth) {
     return mesh;
 }
 
-MeshData asteroid(float radius, int seed) {
+MeshData asteroid(float radius, int seed, int tile_index) {
     const MeshData base = icosahedron(radius, radius > 46.0f ? 3 : 2);
     MeshData mesh = base;
 
@@ -242,6 +242,10 @@ MeshData asteroid(float radius, int seed) {
         b.normal = normal;
         c.normal = normal;
     }
+    // The rock tiles (plan-04 H9): one of the four variants per seed, wrapped triplanar over the
+    // displaced surface. The vertex tone stays, so the craters keep their shading under the tile.
+    mesh.material.base_color_texture = tile_index;
+    mesh.material.triplanar = true;
     return mesh;
 }
 
@@ -353,11 +357,14 @@ int asteroid_mesh(float radius, int seed, MeshLibrary &library) {
     // Twelve radius buckets by eight seeds: at most 96 shapes, all reused.
     const int bucket = std::max(1, static_cast<int>(std::lround(radius / 8.0f)));
     const int rock_seed = seed % 8;
+    // The tile variant rides the seed: carbonaceous, ore-vein, regolith and silicate rotate
+    // through the field (plan-04 H9), so a mining run reads four rock kinds, not one.
+    const int tile = rock_seed % 4;
     const float bucket_radius = static_cast<float>(bucket) * 8.0f;
     char key[48];
     std::snprintf(key, sizeof key, "rock:%d:%d", bucket, rock_seed);
-    return library.get(key, [bucket_radius, rock_seed]() {
-        return meshes::asteroid(bucket_radius, rock_seed);
+    return library.get(key, [bucket_radius, rock_seed, tile]() {
+        return meshes::asteroid(bucket_radius, rock_seed, tile);
     });
 }
 

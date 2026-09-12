@@ -1,4 +1,4 @@
-> **Status: complete.** The live plan is [PLAN-04-assets.md](PLAN-04-assets.md).
+> **Status: complete.** The live plan is [PLAN-05-legibility.md](PLAN-05-legibility.md).
 
 # Opra — base engine plan
 
