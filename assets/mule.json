@@ -1,0 +1,306 @@
+{
+  "name": "mule",
+  "scale": 1.3,
+  "aabb": {
+    "min": [
+      -34.15,
+      -47.05,
+      -17.4
+    ],
+    "max": [
+      34.15,
+      50.4,
+      20.9
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -43,
+      -83,
+      -17.4
+    ],
+    "max": [
+      43,
+      50.4,
+      20.9
+    ]
+  },
+  "collider": {
+    "halfLength": 65,
+    "halfWidth": 43,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          -1
+        ],
+        "angle": 0,
+        "half": [
+          15.4,
+          40.4
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0.2297,
+          24.3197
+        ],
+        "radius": 11.2587
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          -12
+        ],
+        "angle": 0,
+        "half": [
+          6,
+          17
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -18,
+          30
+        ],
+        "angle": 0,
+        "half": [
+          7.9,
+          12.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          18,
+          30
+        ],
+        "angle": 0,
+        "half": [
+          7.9,
+          12.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -24,
+          -24
+        ],
+        "angle": 0,
+        "half": [
+          7.5,
+          10
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -24,
+          18
+        ],
+        "angle": 0,
+        "half": [
+          7.5,
+          10
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          24,
+          -24
+        ],
+        "angle": 0,
+        "half": [
+          7.5,
+          10
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          24,
+          18
+        ],
+        "angle": 0,
+        "half": [
+          7.5,
+          10
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -24,
+          -3
+        ],
+        "angle": 0,
+        "half": [
+          7.5,
+          10
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          24,
+          -3
+        ],
+        "angle": 0,
+        "half": [
+          7.5,
+          10
+        ]
+      }
+    ],
+    "bounds_radius": 54.3546
+  },
+  "ports": [
+    {
+      "id": "A",
+      "pos": [
+        0,
+        -44
+      ],
+      "normal": [
+        0,
+        -1
+      ],
+      "pos3": [
+        0,
+        -44,
+        0
+      ],
+      "normal3": [
+        0,
+        -1,
+        0
+      ],
+      "class": "L"
+    },
+    {
+      "id": "fwd",
+      "pos": [
+        0,
+        48
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "pos3": [
+        0,
+        48,
+        -1
+      ],
+      "normal3": [
+        0,
+        1,
+        0
+      ],
+      "class": "S"
+    }
+  ],
+  "effects": [
+    {
+      "node": "flame",
+      "pos": [
+        -10,
+        -47,
+        0
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        -25,
+        -46,
+        0
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        10,
+        -47,
+        0
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        25,
+        -46,
+        0
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        -34,
+        24,
+        2
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        -34,
+        -24,
+        2
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        34,
+        24,
+        2
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        34,
+        -24,
+        2
+      ]
+    }
+  ],
+  "hardpoints": {
+    "tow": {
+      "pos": [
+        0,
+        47.2,
+        -1
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "mule_normal",
+      "roughness": "mule_roughness",
+      "albedo": "mule_albedo"
+    },
+    "materials": 9
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 19,
+    "vertices": 23048,
+    "triangles": 7708
+  }
+}

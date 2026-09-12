@@ -1,0 +1,220 @@
+{
+  "name": "needle",
+  "scale": 1.3,
+  "aabb": {
+    "min": [
+      -22.717,
+      -46.05,
+      -12.8
+    ],
+    "max": [
+      22.717,
+      48,
+      12.26
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -23,
+      -82,
+      -12.8
+    ],
+    "max": [
+      23,
+      48,
+      12.26
+    ]
+  },
+  "collider": {
+    "halfLength": 62,
+    "halfWidth": 27,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          6.7484
+        ],
+        "angle": 0,
+        "half": [
+          16.8584,
+          41.2415
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          11.75
+        ],
+        "angle": 0,
+        "half": [
+          5.9389,
+          28.75
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -11.5846,
+          -14.1457
+        ],
+        "angle": -2.0121,
+        "half": [
+          22.9583,
+          5.4779
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          11.5846,
+          -14.1457
+        ],
+        "angle": 2.0121,
+        "half": [
+          22.9583,
+          5.4779
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          -35.2
+        ],
+        "angle": 0,
+        "half": [
+          8,
+          10.2
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          29
+        ],
+        "angle": 0,
+        "half": [
+          4.5301,
+          19
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          -33
+        ],
+        "radius": 7
+      }
+    ],
+    "bounds_radius": 51.3025
+  },
+  "ports": [
+    {
+      "id": "A",
+      "pos": [
+        0,
+        -38
+      ],
+      "normal": [
+        0,
+        -1
+      ],
+      "pos3": [
+        0,
+        -38,
+        0
+      ],
+      "normal3": [
+        0,
+        -1,
+        0
+      ],
+      "class": "M"
+    },
+    {
+      "id": "fwd",
+      "pos": [
+        0,
+        48
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "pos3": [
+        0,
+        48,
+        3
+      ],
+      "normal3": [
+        0,
+        1,
+        0
+      ],
+      "class": "S"
+    }
+  ],
+  "effects": [
+    {
+      "node": "flame",
+      "pos": [
+        0,
+        -46,
+        0
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        -14,
+        14,
+        2
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        -14,
+        -24,
+        2
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        14,
+        14,
+        2
+      ]
+    },
+    {
+      "node": "rcs-jet",
+      "pos": [
+        14,
+        -24,
+        2
+      ]
+    }
+  ],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "needle_normal",
+      "roughness": "needle_roughness",
+      "albedo": "needle_albedo"
+    },
+    "materials": 9
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 16,
+    "vertices": 17126,
+    "triangles": 5724
+  }
+}

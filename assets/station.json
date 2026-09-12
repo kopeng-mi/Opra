@@ -1,0 +1,221 @@
+{
+  "name": "station",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -147,
+      -92.8,
+      -56
+    ],
+    "max": [
+      166.8,
+      92.8,
+      56
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -147,
+      -92.8,
+      -56
+    ],
+    "max": [
+      166.8,
+      92.8,
+      56
+    ]
+  },
+  "collider": {
+    "halfLength": 92.8,
+    "halfWidth": 156.9,
+    "shapes": [
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 82.5363
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 81.922
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 80.9376
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 66.137
+      },
+      {
+        "kind": "box",
+        "pos": [
+          112,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          25,
+          45
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -112,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          25,
+          45
+        ]
+      }
+    ],
+    "bounds_radius": 166.9079
+  },
+  "ports": [
+    {
+      "id": "A",
+      "pos": [
+        0,
+        81
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "pos3": [
+        0,
+        81,
+        0
+      ],
+      "normal3": [
+        0,
+        1,
+        0
+      ],
+      "class": "M"
+    },
+    {
+      "id": "B",
+      "pos": [
+        81,
+        0
+      ],
+      "normal": [
+        1,
+        0
+      ],
+      "pos3": [
+        81,
+        0,
+        0
+      ],
+      "normal3": [
+        1,
+        0,
+        0
+      ],
+      "class": "M"
+    },
+    {
+      "id": "C",
+      "pos": [
+        0,
+        -81
+      ],
+      "normal": [
+        0,
+        -1
+      ],
+      "pos3": [
+        0,
+        -81,
+        0
+      ],
+      "normal3": [
+        0,
+        -1,
+        0
+      ],
+      "class": "M"
+    },
+    {
+      "id": "D",
+      "pos": [
+        -81,
+        0
+      ],
+      "normal": [
+        -1,
+        0
+      ],
+      "pos3": [
+        -81,
+        0,
+        0
+      ],
+      "normal3": [
+        -1,
+        0,
+        0
+      ],
+      "class": "L"
+    },
+    {
+      "id": "E",
+      "pos": [
+        155,
+        0
+      ],
+      "normal": [
+        1,
+        0
+      ],
+      "pos3": [
+        155,
+        0,
+        -12
+      ],
+      "normal3": [
+        1,
+        0,
+        0
+      ],
+      "class": "L"
+    }
+  ],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "station_normal",
+      "roughness": "station_roughness",
+      "albedo": "station_albedo"
+    },
+    "materials": 12
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 17,
+    "vertices": 59910,
+    "triangles": 19970
+  }
+}

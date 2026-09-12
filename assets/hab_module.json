@@ -1,0 +1,125 @@
+{
+  "name": "hab_module",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -6.692,
+      -12,
+      -6.2731
+    ],
+    "max": [
+      8.06,
+      11.6,
+      6.8
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -6.692,
+      -12,
+      -6.2731
+    ],
+    "max": [
+      8.06,
+      11.6,
+      6.8
+    ]
+  },
+  "collider": {
+    "halfLength": 11.8,
+    "halfWidth": 7.376,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          -0.4
+        ],
+        "angle": 0,
+        "half": [
+          5.9389,
+          11.6
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          6.35,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          1.55,
+          2.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          -7.2
+        ],
+        "angle": 0,
+        "half": [
+          6.15,
+          0.45
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          7.2
+        ],
+        "angle": 0,
+        "half": [
+          6.15,
+          0.45
+        ]
+      }
+    ],
+    "bounds_radius": 13.432
+  },
+  "ports": [
+    {
+      "id": "side",
+      "pos": [
+        8,
+        0
+      ],
+      "normal": [
+        1,
+        0
+      ],
+      "pos3": [
+        8,
+        0,
+        0
+      ],
+      "normal3": [
+        1,
+        0,
+        0
+      ],
+      "class": "M"
+    }
+  ],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "hab_module_normal",
+      "roughness": "hab_module_roughness",
+      "albedo": "hab_module_albedo"
+    },
+    "materials": 7
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 9,
+    "vertices": 7932,
+    "triangles": 2644
+  }
+}

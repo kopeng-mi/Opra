@@ -1,0 +1,189 @@
+{
+  "name": "radiator_panel",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -1.95,
+      -0.75,
+      -0.68
+    ],
+    "max": [
+      1.95,
+      8.5,
+      0.68
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -1.95,
+      -0.75,
+      -0.68
+    ],
+    "max": [
+      1.95,
+      8.5,
+      0.68
+    ]
+  },
+  "collider": {
+    "halfLength": 4.625,
+    "halfWidth": 1.95,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          4.9
+        ],
+        "angle": 0,
+        "half": [
+          1.7,
+          2.96
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          4.9
+        ],
+        "angle": 0,
+        "half": [
+          0.5,
+          2.8
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.2
+        ],
+        "angle": 0,
+        "half": [
+          1.8,
+          0.45
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          7.9
+        ],
+        "angle": 0,
+        "half": [
+          1.95,
+          0.3
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          1.7,
+          0.32
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -1.78,
+          4.9
+        ],
+        "angle": 0,
+        "half": [
+          0.125,
+          2.85
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          1.78,
+          4.9
+        ],
+        "angle": 0,
+        "half": [
+          0.125,
+          2.85
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -1.1,
+          4.9
+        ],
+        "angle": 0,
+        "half": [
+          0.13,
+          2.7
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          1.1,
+          4.9
+        ],
+        "angle": 0,
+        "half": [
+          0.13,
+          2.7
+        ]
+      }
+    ],
+    "bounds_radius": 9.873
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {
+    "hinge": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        -0.707107,
+        0.707107
+      ]
+    },
+    "tip": {
+      "pos": [
+        0,
+        8.35,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "radiator_panel_normal",
+      "roughness": "radiator_panel_roughness",
+      "albedo": "radiator_panel_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 6,
+    "vertices": 1788,
+    "triangles": 596
+  }
+}

@@ -1,0 +1,19 @@
+build/
+vcpkg_installed/
+.vs/
+out/
+*.user
+*.bmp
+*.obj
+
+# Dependency and tool caches: reproducible from the manifests (vcpkg.json, package.json).
+tools/node_modules/
+tools/__pycache__/
+__pycache__/
+
+# Image reference material for the asset prompts: 62 MB of scraped art, not project source.
+# The prompt sheets and the checklist that drive it stay in research/prompts and research/*.md.
+research/refs/
+
+# Golden views and their references are versioned (tools/shots.ps1 -Check reads them);
+# scratch captures are not: *.bmp above covers the working files, artifacts keeps only pngs.

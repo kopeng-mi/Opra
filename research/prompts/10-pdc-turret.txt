@@ -1,0 +1,13 @@
+Produce exactly one image. It is a flat, evenly lit, orthographic technical render of a single object, made so that its shape and proportions can be read precisely. It is not a poster, not a scene, not a cinematic shot, and not a photograph of a printed sheet or a drawing.
+
+Subject. A point-defence cannon turret, 1.8 metres across. A rotating armoured dome set into a shallow circular hull recess, with two rapid-fire barrels side by side on a cradle that can tilt. An ammunition feed housing sits below the dome and a rectangular ejection port on one side. The barrels are turned 30 degrees to one side and raised 20 degrees. Heavy soot at the muzzles, bare metal worn bright in a ring where the dome rotates.
+
+Style. Industrial hard science-fiction in the visual logic of The Expanse: no aerodynamic streamlining, no smooth curved shell. The hull is visible structure - exposed frames, bolted plate seams, weld lines, machined fittings, cable runs and conduit. Weathering: soot aft of every thruster, small impact pitting across forward surfaces, paint worn through to bare metal around hatches and handholds, and a few replacement panels in a slightly different shade. Matte painted metal and ceramic only. No chrome, no mirror finish, no neon, no glowing seams, no light strips.
+
+Palette, use these exact colours: hull plate #BAC4C3, light plate #E2E3D8, shadowed structure #202E38, bare metal #667681, copper trim #C88755, black recess #0C141A, tinted glass #376C7C, teal marking band #326B70, ochre marking band #BC783C.
+
+Render. 3D hard-surface render. Soft even lighting from the upper front left with a weak fill from the right, so no surface is in darkness. Ambient occlusion in the crevices. Sharp edges, everything in focus, no depth of field.
+
+Layout. One image, divided into three separate views of the same object in a single row. Left: seen from directly in front. Centre: seen from directly to its side. Right: seen from 30 degrees above and to one side. All three are orthographic with no perspective, at the same scale, with the same lighting and the same colours. Stand a plain grey untextured cube exactly 1 metre on each side on the ground next to the object in every view, for scale. The background is pure white #FFFFFF.
+
+Do not include: perspective distortion, cast shadows falling on the background, text, letters, numbers, labels, dimension lines, arrows, callouts, watermarks, logos, insignia, human figures, planets, stars, starfields, nebulae, lens flare, glow, motion blur, ground planes, or any background object other than the stated scale cube.

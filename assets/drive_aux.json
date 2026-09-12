@@ -1,0 +1,190 @@
+{
+  "name": "drive_aux",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.1956,
+      0,
+      -2.02
+    ],
+    "max": [
+      2.1956,
+      3.6,
+      2.02
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -2.8252,
+      -10,
+      -2.02
+    ],
+    "max": [
+      2.8252,
+      3.6,
+      2.02
+    ]
+  },
+  "collider": {
+    "halfLength": 1.8,
+    "halfWidth": 2.196,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.6
+        ],
+        "angle": 0,
+        "half": [
+          1.9696,
+          1.6
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.515
+        ],
+        "angle": 0,
+        "half": [
+          1.8134,
+          1.335
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.18
+        ],
+        "angle": 0,
+        "half": [
+          1.9694,
+          0.175
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          3.215
+        ],
+        "angle": 0,
+        "half": [
+          1.55,
+          0.165
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2.25
+        ],
+        "angle": 0,
+        "half": [
+          1.3844,
+          0.17
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.85
+        ],
+        "angle": 0,
+        "half": [
+          1.5,
+          0.14
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          3.42
+        ],
+        "angle": 0,
+        "half": [
+          1.16,
+          0.18
+        ]
+      }
+    ],
+    "bounds_radius": 4.7738
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "vernier_port",
+      "pos": [
+        -1.4031,
+        2.7443,
+        0
+      ]
+    },
+    {
+      "node": "vernier_stbd",
+      "pos": [
+        1.4031,
+        2.7443,
+        0
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "hardpoints": {
+    "mount": {
+      "pos": [
+        0,
+        3.6,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "thrust": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "drive_aux_normal",
+      "roughness": "drive_aux_roughness",
+      "albedo": "drive_aux_albedo"
+    },
+    "materials": 5
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 9,
+    "vertices": 3810,
+    "triangles": 1280
+  }
+}

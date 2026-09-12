@@ -1,0 +1,119 @@
+{
+  "name": "surface_base",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -102,
+      -92.315,
+      -14.8486
+    ],
+    "max": [
+      94,
+      88.6,
+      60.1714
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -102,
+      -92.315,
+      -14.8486
+    ],
+    "max": [
+      94,
+      88.6,
+      60.1714
+    ]
+  },
+  "collider": {
+    "halfLength": 90.458,
+    "halfWidth": 98,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          -4,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          98,
+          75
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 22.0101
+      }
+    ],
+    "bounds_radius": 127.4059
+  },
+  "ports": [
+    {
+      "id": "padA",
+      "pos": [
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        0
+      ],
+      "pos3": [
+        0,
+        0,
+        0
+      ],
+      "normal3": [
+        0,
+        0,
+        1
+      ],
+      "class": "L"
+    },
+    {
+      "id": "padB",
+      "pos": [
+        66,
+        46
+      ],
+      "normal": [
+        0,
+        0
+      ],
+      "pos3": [
+        66,
+        46,
+        0
+      ],
+      "normal3": [
+        0,
+        0,
+        1
+      ],
+      "class": "L"
+    }
+  ],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "surface_base_normal",
+      "roughness": "surface_base_roughness",
+      "albedo": "surface_base_albedo"
+    },
+    "materials": 8
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 14,
+    "vertices": 62184,
+    "triangles": 20728
+  }
+}

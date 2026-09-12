@@ -1,0 +1,15 @@
+Produce exactly one image. It is a flat, evenly lit, orthographic technical render of a single object, made so that its shape and proportions can be read precisely. It is not a poster, not a scene, not a cinematic shot, and not a photograph of a printed sheet or a drawing.
+
+Subject. A 31-metre reconnaissance cutter, roughly eight times as long as it is wide. A long slender fuselage with one fusion drive bell at the stern that is the single largest component on the ship and fills the rear third of its length. A thin sensor needle projects forward from the centre of the nose. Two flat radiator blades sweep back from the flanks at an angle. The armour is minimal and the structural framing is left exposed along the sides. One point-defence cannon turret on the underside. A small two-person cabin with one window, set well forward.
+
+Style. Industrial hard science-fiction in the visual logic of The Expanse: no aerodynamic streamlining, no smooth curved shell. The hull is visible structure - exposed frames, bolted plate seams, weld lines, machined fittings, cable runs and conduit. Weathering: soot aft of every thruster, small impact pitting across forward surfaces, paint worn through to bare metal around hatches and handholds, and a few replacement panels in a slightly different shade. Matte painted metal and ceramic only. No chrome, no mirror finish, no neon, no glowing seams, no light strips.
+
+Palette, use these exact colours: hull plate #BAC4C3, light plate #E2E3D8, shadowed structure #202E38, bare metal #667681, copper trim #C88755, black recess #0C141A, tinted glass #376C7C, teal marking band #326B70, ochre marking band #BC783C.
+
+Render. 3D hard-surface render. Soft even lighting from the upper front left with a weak fill from the right, so no surface is in darkness. Ambient occlusion in the crevices. Sharp edges, everything in focus, no depth of field.
+
+Layout. One image, divided into a 2x2 grid of four separate views of the same object. Top left: seen from directly above. Top right: seen from directly to its left side. Bottom left: seen from directly in front, nose toward the viewer. Bottom right: seen from behind and 30 degrees above. All four are orthographic with no perspective, at the same scale, with the same lighting and the same colours, each centred in its own cell. The background is pure white #FFFFFF in every cell.
+
+Priority. Of the four views, the one seen from directly above matters most - it is the only view of this object that will ever be used. Give it the most care. Its outline must be bold and distinctive, and the nose end must be a clearly different shape from the stern end, so that the direction the object points is obvious from the outline alone, with no colour or shading.
+
+Do not include: perspective distortion, cast shadows falling on the background, text, letters, numbers, labels, dimension lines, arrows, callouts, watermarks, logos, insignia, human figures, planets, stars, starfields, nebulae, lens flare, glow, motion blur, ground planes, or any background object other than the stated scale cube.

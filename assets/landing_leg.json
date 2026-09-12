@@ -1,0 +1,184 @@
+{
+  "name": "landing_leg",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -3.1,
+      -8.55,
+      -2.6
+    ],
+    "max": [
+      2.2141,
+      2.2,
+      2.6
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -3.1,
+      -8.55,
+      -2.6
+    ],
+    "max": [
+      2.2141,
+      2.2,
+      2.6
+    ]
+  },
+  "collider": {
+    "halfLength": 5.375,
+    "halfWidth": 2.657,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.7
+        ],
+        "angle": 0,
+        "half": [
+          1.2,
+          1.5
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -0.6,
+          -8
+        ],
+        "angle": 0,
+        "half": [
+          2.3886,
+          0.55
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0.75,
+          -2.25
+        ],
+        "angle": 1.9757,
+        "half": [
+          1.9039,
+          0.42
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0.45,
+          -6.25
+        ],
+        "angle": -2.1112,
+        "half": [
+          2.0408,
+          0.36
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -0.2773,
+          -2.3206
+        ],
+        "angle": 2.0971,
+        "half": [
+          1.9849,
+          0.4226
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -0.6,
+          -7.5
+        ],
+        "angle": 0,
+        "half": [
+          0.8,
+          0.7
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -0.6,
+          -8.05
+        ],
+        "angle": 0,
+        "half": [
+          2.5,
+          0.175
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          1.5,
+          -4.3
+        ],
+        "angle": -1.2708,
+        "half": [
+          0.8,
+          0.5
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -0.35,
+          -0.3
+        ],
+        "angle": 0,
+        "half": [
+          0.5,
+          1.1
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          1.5,
+          -4.3
+        ],
+        "radius": 0.5989
+      }
+    ],
+    "bounds_radius": 10.5785
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {
+    "contact": {
+      "pos": [
+        -0.6,
+        -8.55,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "landing_leg_normal",
+      "roughness": "landing_leg_roughness",
+      "albedo": "landing_leg_albedo"
+    },
+    "materials": 4
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 4,
+    "vertices": 2220,
+    "triangles": 740
+  }
+}

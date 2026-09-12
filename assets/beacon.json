@@ -1,0 +1,99 @@
+{
+  "name": "beacon",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -11.4551,
+      -11,
+      -11.4
+    ],
+    "max": [
+      11.4551,
+      28.6,
+      11.4
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -11.4551,
+      -11,
+      -11.4
+    ],
+    "max": [
+      11.4551,
+      34,
+      11.4
+    ]
+  },
+  "collider": {
+    "halfLength": 19.8,
+    "halfWidth": 11.455,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          4.6
+        ],
+        "angle": 0,
+        "half": [
+          11.4,
+          15.6
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          6.5054,
+          0.4
+        ],
+        "angle": 0,
+        "half": [
+          4.2952,
+          5.2
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -6.5054,
+          0.4
+        ],
+        "angle": 0,
+        "half": [
+          4.2952,
+          5.2
+        ]
+      }
+    ],
+    "bounds_radius": 28.6001
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "halo",
+      "pos": [
+        0,
+        27,
+        2.3
+      ]
+    }
+  ],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "beacon_normal",
+      "roughness": "beacon_roughness",
+      "albedo": "beacon_albedo"
+    },
+    "materials": 5
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 9,
+    "vertices": 10006,
+    "triangles": 3372
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "name": "station_depot",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -50.2,
+      -71.2,
+      -14.2
+    ],
+    "max": [
+      50.2,
+      71.2,
+      28.6
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -50.2,
+      -71.2,
+      -14.2
+    ],
+    "max": [
+      50.2,
+      71.2,
+      28.6
+    ]
+  },
+  "collider": {
+    "halfLength": 71.2,
+    "halfWidth": 50.2,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          6.5,
+          58.375
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          12
+        ],
+        "radius": 13
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          2.5348,
+          66
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -44,
+          -34
+        ],
+        "angle": 1.5708,
+        "half": [
+          14,
+          6.2
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -44,
+          34
+        ],
+        "angle": -1.5708,
+        "half": [
+          14,
+          6.2
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          44,
+          -34
+        ],
+        "angle": -1.5708,
+        "half": [
+          14,
+          6.2
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          44,
+          34
+        ],
+        "angle": 1.5708,
+        "half": [
+          14,
+          6.2
+        ]
+      }
+    ],
+    "bounds_radius": 71.2475
+  },
+  "ports": [
+    {
+      "id": "A",
+      "pos": [
+        0,
+        71.8
+      ],
+      "normal": [
+        0,
+        1
+      ],
+      "pos3": [
+        0,
+        71.8,
+        0
+      ],
+      "normal3": [
+        0,
+        1,
+        0
+      ],
+      "class": "M"
+    },
+    {
+      "id": "B",
+      "pos": [
+        0,
+        -71.8
+      ],
+      "normal": [
+        0,
+        -1
+      ],
+      "pos3": [
+        0,
+        -71.8,
+        0
+      ],
+      "normal3": [
+        0,
+        -1,
+        0
+      ],
+      "class": "M"
+    }
+  ],
+  "effects": [],
+  "hardpoints": {
+    "deck": {
+      "pos": [
+        0,
+        12,
+        -12.9
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "mast": {
+      "pos": [
+        0,
+        -38,
+        26.4
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "transfer": {
+      "pos": [
+        34.4,
+        10,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "station_depot_normal",
+      "roughness": "station_depot_roughness",
+      "albedo": "station_depot_albedo"
+    },
+    "materials": 9
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 11,
+    "vertices": 20028,
+    "triangles": 6676
+  }
+}

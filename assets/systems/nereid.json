@@ -1,0 +1,52 @@
+{
+  "_comment": "Nereid: a compact M-dwarf system. Times are seconds, distances metres, angles radians, mu m^3/s^2. Bodies orbit the barycentre through their parent (E1/E4). Not a line of this is hardcoded in C++.",
+  "name": "Nereid",
+  "epoch": 0,
+  "star": { "name": "Nereid", "mu": 2.07e19, "radius": 3.4e8, "color": "#ff9c5c" },
+  "bodies": [
+    { "id": "cinder",  "name": "Cinder",  "parent": "nereid",
+      "kind": "planet", "mu": 2.2e12, "radius": 4.1e6, "model": "planet_rock",
+      "a": 7.18e9, "e": 0.011, "omega": 0.42, "M0": 2.48,
+      "terrain": { "seed": 3311, "amplitude": 0.006,
+                   "pads": [ { "theta": 0.90, "width": 1200.0, "name": "Cinder Flats" } ] } },
+
+    { "id": "tessera", "name": "Tessera", "parent": "nereid",
+      "kind": "planet", "mu": 1.9e13, "radius": 6.3e6, "model": "planet_temperate",
+      "a": 1.720e10, "e": 0.034, "omega": 1.97, "M0": 1.52,
+      "atmosphere": { "rho0": 1.10, "H": 7800.0, "top": 110000.0 },
+      "terrain": { "seed": 8801, "amplitude": 0.0035,
+                   "pads": [ { "theta": 1.20, "width": 2600.0, "name": "Tessera Downport" },
+                             { "theta": 4.05, "width": 1400.0, "name": "North Shelf" } ] },
+      "surface": { "pad": 0, "name": "Tessera Downport", "model": "surface_base" } },
+
+    { "id": "vesk",    "name": "Vesk",    "parent": "tessera",
+      "kind": "moon",   "mu": 8.1e10, "radius": 1.4e6, "model": "moon_grey",
+      "a": 5.2e7, "e": 0.002, "omega": 0.0, "M0": 5.41,
+      "terrain": { "seed": 4402, "amplitude": 0.006,
+                   "pads": [ { "theta": 2.70, "width": 900.0, "name": "Vesk Yard" } ] } },
+
+    { "id": "halberd", "name": "Halberd", "parent": "nereid",
+      "kind": "planet", "mu": 3.4e13, "radius": 8.9e6, "model": "planet_ice",
+      "a": 4.338e10, "e": 0.091, "omega": 3.31, "M0": 3.51,
+      "atmosphere": { "rho0": 0.36, "H": 9200.0, "top": 130000.0 },
+      "terrain": { "seed": 5507, "amplitude": 0.003,
+                   "pads": [ { "theta": 0.60, "width": 1800.0, "name": "Halberd Ice Camp" } ] } }
+  ],
+  "belt": { "id": "drift", "parent": "nereid", "inner": 2.46e10, "outer": 2.89e10,
+            "count": 4200, "seed": 4712 },
+  "stations": [
+    { "id": "wayfarer", "name": "Wayfarer", "parent": "nereid", "model": "station",
+      "a": 2.61e10, "e": 0.004, "omega": 0.9, "M0": 0.0 },
+
+    { "_comment": "The L1 waystation on Tessera: co-rotating placement, not a conic (plan 3.5). a is Tessera's L1 radius: a(1-(mu/3)^(1/3)).",
+      "id": "tessera_l1", "name": "Tessera L1", "parent": "tessera", "model": "station_depot",
+      "radius": 40.0, "a": 1.7084e10, "e": 0.0, "omega": 0.0, "M0": 0.0,
+      "lagrange": { "primary": "tessera", "point": 1 } },
+
+    { "_comment": "The L4 base: the largest built thing in the system. a equals the secondary's radius, 60 degrees ahead.",
+      "id": "tessera_l4", "name": "Tessera L4", "parent": "tessera", "model": "station_lagrange",
+      "radius": 120.0, "a": 1.720e10, "e": 0.0, "omega": 0.0, "M0": 1.0471975511965976,
+      "lagrange": { "primary": "tessera", "point": 4 } }
+  ],
+  "jump_links": []
+}

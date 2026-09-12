@@ -1,0 +1,162 @@
+{
+  "name": "derelict",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -43.4936,
+      -90.6039,
+      -10.5
+    ],
+    "max": [
+      38.9032,
+      69.4,
+      15.2
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -43.4936,
+      -90.6039,
+      -10.5
+    ],
+    "max": [
+      38.9032,
+      69.4,
+      15.2
+    ]
+  },
+  "collider": {
+    "halfLength": 80.002,
+    "halfWidth": 41.198,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          -7,
+          -50
+        ],
+        "angle": -1.4108,
+        "half": [
+          32.4,
+          14.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          12
+        ],
+        "angle": 0,
+        "half": [
+          14.4,
+          21.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          51
+        ],
+        "angle": 0,
+        "half": [
+          15.4,
+          18.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          52
+        ],
+        "angle": 0,
+        "half": [
+          11.4,
+          16.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -10,
+          -72
+        ],
+        "angle": -1.4108,
+        "half": [
+          14.4,
+          9.4
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          26.0828,
+          -34.0696
+        ],
+        "angle": -2.6444,
+        "half": [
+          8.0951,
+          12.1009
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -16.0123,
+          -52.0707
+        ],
+        "angle": 1.9867,
+        "half": [
+          9.765,
+          7.2722
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -32.0007,
+          -16.2337
+        ],
+        "angle": -2.3561,
+        "half": [
+          10.2673,
+          7.0426
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          11.932,
+          51.8054
+        ],
+        "angle": 1.9295,
+        "half": [
+          8.9295,
+          7.0885
+        ]
+      }
+    ],
+    "bounds_radius": 90.6063
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "derelict_normal",
+      "roughness": "derelict_roughness",
+      "albedo": "derelict_albedo"
+    },
+    "materials": 8
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 9,
+    "vertices": 6264,
+    "triangles": 2088
+  }
+}

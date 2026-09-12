@@ -1,0 +1,138 @@
+{
+  "name": "drive_main",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -4.9526,
+      0,
+      -5.08
+    ],
+    "max": [
+      4.9526,
+      8.2,
+      5.08
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -4.9526,
+      -26,
+      -5.08
+    ],
+    "max": [
+      4.9526,
+      8.2,
+      5.08
+    ]
+  },
+  "collider": {
+    "halfLength": 4.1,
+    "halfWidth": 4.953,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          3.625
+        ],
+        "angle": 0,
+        "half": [
+          4.924,
+          3.625
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          3.575
+        ],
+        "angle": 0,
+        "half": [
+          4.8,
+          3.325
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          5.05
+        ],
+        "angle": 0,
+        "half": [
+          3.72,
+          0.3994
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.28
+        ],
+        "angle": 0,
+        "half": [
+          4.9526,
+          0.275
+        ]
+      }
+    ],
+    "bounds_radius": 9.7395
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "flame",
+      "pos": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "hardpoints": {
+    "mount": {
+      "pos": [
+        0,
+        8.2,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    "thrust": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "drive_main_normal",
+      "roughness": "drive_main_roughness",
+      "albedo": "drive_main_albedo"
+    },
+    "materials": 5
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 7,
+    "vertices": 4478,
+    "triangles": 1496
+  }
+}

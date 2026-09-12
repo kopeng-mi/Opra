@@ -1,0 +1,8 @@
+{
+  "name": "opra-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "three": "^0.183.2"
+  }
+}

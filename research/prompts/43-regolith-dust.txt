@@ -1,0 +1,9 @@
+Produce exactly one image: a flat rectangular texture map, to be wrapped onto a 3D surface in a game engine. It is a flat picture of a surface and nothing else. It is not an object, not a sphere, not a scene, not a photograph of anything with edges or depth.
+
+Subject. Fine loose grey regolith dust on an airless surface, seen from directly above, covering about 3 metres across. Soft powder with faint ripples, a scatter of small angular rock fragments of varying sizes partly buried in it, a few tiny fresh craters with slightly brighter rims, and very subtle variation between lighter and darker grey. No footprints, no tracks.
+
+Layout. One square image of a flat surface seen from directly overhead, filling the frame edge to edge. It must tile seamlessly: the left edge must continue into the right edge and the top edge into the bottom edge with no visible seam. Keep the detail evenly spread, with no single feature large or distinctive enough to be noticed repeating when the image is tiled across a large area.
+
+Lighting. Completely flat and even, as though lit from every direction at once. There must be no sun, no directional light, no cast shadows, no terminator, no day and night division, no specular highlights, and no darkening toward any edge. This image records surface colour only. Lighting is added later by the engine, so any lighting baked in here would be wrong twice over.
+
+Do not include: a sphere, a globe, a planet seen from space, a curved horizon, any three-dimensional object, black space, stars, a starfield, a nebula, atmosphere, glow, a border, a frame, a vignette, a drop shadow, text, letters, numbers, labels, watermarks, or a colour chart.

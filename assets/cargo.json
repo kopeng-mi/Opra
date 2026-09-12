@@ -1,0 +1,102 @@
+{
+  "name": "cargo",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -10.182,
+      -11.4469,
+      -7.4607
+    ],
+    "max": [
+      10.182,
+      11.4469,
+      7.4607
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -10.182,
+      -11.4469,
+      -7.4607
+    ],
+    "max": [
+      10.182,
+      11.4469,
+      7.4607
+    ]
+  },
+  "collider": {
+    "halfLength": 11.447,
+    "halfWidth": 10.182,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0
+        ],
+        "angle": -1.1662,
+        "half": [
+          8.9506,
+          6.556
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          3.185,
+          -7.4384
+        ],
+        "angle": 0.4104,
+        "half": [
+          6.3653,
+          1.113
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -3.3917,
+          -2.5326
+        ],
+        "angle": -1.1662,
+        "half": [
+          8.2055,
+          0.7554
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          4.4899,
+          0.897
+        ],
+        "angle": -1.1662,
+        "half": [
+          8.2055,
+          0.7554
+        ]
+      }
+    ],
+    "bounds_radius": 14.5535
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "cargo_normal",
+      "roughness": "cargo_roughness",
+      "albedo": "cargo_albedo"
+    },
+    "materials": 7
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 8,
+    "vertices": 3012,
+    "triangles": 1004
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "name": "ore",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -6.6416,
+      -6.8388,
+      -6.1791
+    ],
+    "max": [
+      7.08,
+      6.6856,
+      6.3949
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -6.6416,
+      -6.8388,
+      -6.1791
+    ],
+    "max": [
+      7.08,
+      6.6856,
+      6.3949
+    ]
+  },
+  "collider": {
+    "halfLength": 6.762,
+    "halfWidth": 6.861,
+    "shapes": [
+      {
+        "kind": "circle",
+        "pos": [
+          0.26,
+          -0.1256
+        ],
+        "radius": 6.82
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          -0.0148,
+          0.0046
+        ],
+        "radius": 6.4881
+      }
+    ],
+    "bounds_radius": 7.2148
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "ore_normal",
+      "roughness": "ore_roughness",
+      "albedo": "ore_albedo"
+    },
+    "materials": 3
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 4,
+    "vertices": 2616,
+    "triangles": 872
+  }
+}

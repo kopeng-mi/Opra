@@ -1,0 +1,135 @@
+{
+  "name": "rcs_block",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.4277,
+      -2.4277,
+      -1.75
+    ],
+    "max": [
+      2.4277,
+      2.4277,
+      2.1
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -3.394,
+      -3.394,
+      -1.75
+    ],
+    "max": [
+      3.394,
+      3.394,
+      2.1
+    ]
+  },
+  "collider": {
+    "halfLength": 2.428,
+    "halfWidth": 2.428,
+    "shapes": [
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 1.8
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          0
+        ],
+        "radius": 1.5
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          1.02,
+          1.02
+        ],
+        "radius": 0.475
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          -1.02,
+          1.02
+        ],
+        "radius": 0.475
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          -1.02,
+          -1.02
+        ],
+        "radius": 0.475
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          1.02,
+          -1.02
+        ],
+        "radius": 0.475
+      }
+    ],
+    "bounds_radius": 3.0515
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "jet.0",
+      "pos": [
+        1.5018,
+        1.5018,
+        0
+      ]
+    },
+    {
+      "node": "jet.1",
+      "pos": [
+        -1.5018,
+        1.5018,
+        0
+      ]
+    },
+    {
+      "node": "jet.2",
+      "pos": [
+        -1.5018,
+        -1.5018,
+        0
+      ]
+    },
+    {
+      "node": "jet.3",
+      "pos": [
+        1.5018,
+        -1.5018,
+        0
+      ]
+    }
+  ],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "rcs_block_normal",
+      "roughness": "rcs_block_roughness",
+      "albedo": "rcs_block_albedo"
+    },
+    "materials": 3
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 7,
+    "vertices": 1412,
+    "triangles": 484
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "name": "tank_small",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.5679,
+      -0.005,
+      -2.7
+    ],
+    "max": [
+      3.39,
+      10.225,
+      2.7
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -2.5679,
+      -0.005,
+      -2.7
+    ],
+    "max": [
+      3.39,
+      10.225,
+      2.7
+    ]
+  },
+  "collider": {
+    "halfLength": 5.115,
+    "halfWidth": 2.979,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          5.3
+        ],
+        "angle": 0,
+        "half": [
+          2.1448,
+          4.5
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          5.3
+        ],
+        "angle": 0,
+        "half": [
+          2.2813,
+          2.8
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          2.4419,
+          5.1082
+        ],
+        "angle": -1.4273,
+        "half": [
+          4.3982,
+          0.6606
+        ]
+      }
+    ],
+    "bounds_radius": 10.2964
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "tank_small_normal",
+      "roughness": "tank_small_roughness",
+      "albedo": "tank_small_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 6,
+    "vertices": 2436,
+    "triangles": 812
+  }
+}

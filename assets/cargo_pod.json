@@ -1,0 +1,92 @@
+{
+  "name": "cargo_pod",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.95,
+      -0.64,
+      -2.95
+    ],
+    "max": [
+      2.95,
+      6.95,
+      4.0691
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -2.95,
+      -0.64,
+      -2.95
+    ],
+    "max": [
+      2.95,
+      6.95,
+      4.0691
+    ]
+  },
+  "collider": {
+    "halfLength": 3.795,
+    "halfWidth": 2.95,
+    "shapes": [
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          3.2
+        ],
+        "radius": 3
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          3.2
+        ],
+        "radius": 2.5
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          3.2
+        ],
+        "radius": 2.3
+      }
+    ],
+    "bounds_radius": 7.1921
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {
+    "lift": {
+      "pos": [
+        0,
+        6.4,
+        0
+      ],
+      "rot": [
+        0,
+        0,
+        0,
+        1
+      ]
+    }
+  },
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "cargo_pod_normal",
+      "roughness": "cargo_pod_roughness",
+      "albedo": "cargo_pod_albedo"
+    },
+    "materials": 7
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 7,
+    "vertices": 2328,
+    "triangles": 776
+  }
+}
