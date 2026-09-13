@@ -38,12 +38,16 @@ SDL_GPUShader *mesh_shader(SDL_GPUDevice *dev, const char *path, const char *ent
  * layout, so one buffer binding serves every run in the scene pass.
  */
 SDL_GPUGraphicsPipeline *create_mesh_pipeline(SDL_GPUDevice *dev, Uint32 samples, bool additive,
-                                              bool flame_fade) {
+                                              bool flame_fade,
+                                              const char *fragment_path = nullptr,
+                                              const char *fragment_entry = nullptr) {
     SDL_GPUShader *vs =
         mesh_shader(dev, flame_fade ? "shaders/mesh_vs_flame.dxil" : "shaders/mesh_vs.dxil",
                     flame_fade ? "VSFlame" : "VSMain", SDL_GPU_SHADERSTAGE_VERTEX, 1, 0);
     SDL_GPUShader *ps =
-        additive
+        fragment_path != nullptr
+            ? mesh_shader(dev, fragment_path, fragment_entry, SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0)
+        : additive
             ? mesh_shader(dev, "shaders/mesh_ps_ambient.dxil", "PSAmbient",
                           SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0)
             : mesh_shader(dev, "shaders/mesh_ps.dxil", "PSMain", SDL_GPU_SHADERSTAGE_FRAGMENT, 2,
@@ -455,7 +459,8 @@ void write_ui_indices(Renderer &renderer, SDL_GPUCopyPass *pass, const uint32_t 
  *  12 km depth range: the receivers that matter are the ones within a few hundred metres of the
  *  ship, and a cascade has one resolution to spend. */
 glm::mat4 fit_shadow_cascade(const Camera &camera, const glm::vec3 &to_star) {
-    const float half = std::max(camera.half_height * camera.aspect, camera.half_height) * 1.25f;
+    const float half = static_cast<float>(
+        std::max(camera.half_height * camera.aspect, camera.half_height) * 1.25);
     const glm::vec3 centre(camera.target.x, camera.target.y, 0.0f);
     const glm::vec3 direction = glm::length(to_star) > 1e-4f ? glm::normalize(to_star)
                                                              : glm::vec3(0.0f, 0.0f, 1.0f);
@@ -485,7 +490,10 @@ const PipelineSet &Renderer::pipelines_for(SDL_GPUTextureFormat format, Uint32 r
     set.format = format;
     set.samples = wanted;
     set.mesh = create_mesh_pipeline(device.handle, wanted, false, false);
-    set.effect = create_mesh_pipeline(device.handle, wanted, true, true);
+    // Effects are the one additive family that is emissive rather than lit: the flame shader's
+    // colour is the whole contribution (see mesh.hlsl's PSFlame).
+    set.effect = create_mesh_pipeline(device.handle, wanted, true, true,
+                                      "shaders/mesh_ps_flame.dxil", "PSFlame");
     set.backdrop = create_mesh_pipeline(device.handle, wanted, true, false);
     set.planet = create_body_pipeline(device.handle, wanted, "shaders/planet_vs.dxil", "VSMain",
                                       "shaders/planet_ps.dxil", "PSMain", false, true, 3);
@@ -722,6 +730,7 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
             draw.mesh = body.mesh;
             draw.shell = shell;
             draw.star = star;
+            draw.deep = body.deep;
             sky_draws.push_back(draw);
             sky_instances.push_back(draw.instance);
         };
@@ -796,8 +805,8 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
     // ------------------------------------------------------------------ the star's cascade
     const glm::mat4 shadow_matrix = fit_shadow_cascade(camera, scene.light.direction_to_star);
     renderer.shadow_view_proj = shadow_matrix;
-    const float cascade_half =
-        std::max(camera.half_height * camera.aspect, camera.half_height) * 1.25f;
+    const float cascade_half = static_cast<float>(
+        std::max(camera.half_height * camera.aspect, camera.half_height) * 1.25);
     const bool casting = !runs.empty() && !renderer.meshes.empty();
     if (casting) {
         if (!renderer.shadow_map) renderer.shadow_map = create_shadow_map(renderer.device);
@@ -886,42 +895,45 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
 
     // The sky bodies first: the planet surfaces write depth, the star and the air shells add to the
     // frame around them.
+    // Shared by the near set and the deep set: one indexed draw per sky body, its own maps bound
+    // and its own uniform block pushed.
+    const auto draw_sky = [&](SDL_GPUGraphicsPipeline *pipeline, bool shell, bool star,
+                              Uint32 samplers, bool deep) {
+        int drawn = 0;
+        for (size_t i = 0; i < sky_draws.size(); ++i) {
+            if (sky_draws[i].shell != shell || sky_draws[i].star != star) continue;
+            if (sky_draws[i].deep != deep) continue;
+            if (drawn == 0) SDL_BindGPUGraphicsPipeline(pass, pipeline);
+            ++drawn;
+            // A body samples the maps its system file named, and the white texel for every
+            // slot it did not, so the shader's flag decides and the sampler is never a hole.
+            if (samplers > 0) {
+                SDL_GPUTextureSamplerBinding bindings[3]{};
+                for (Uint32 slot = 0; slot < samplers; ++slot) {
+                    bindings[slot] = {
+                        sky_draws[i].maps[slot] ? sky_draws[i].maps[slot] : renderer.white,
+                        sky_draws[i].tile ? renderer.map_sampler_tile
+                                          : renderer.map_sampler_equirect};
+                }
+                SDL_BindGPUFragmentSamplers(pass, 0, bindings, samplers);
+            }
+            SDL_PushGPUVertexUniformData(cmd, 0, &sky_draws[i].uniforms,
+                                         sizeof(BodyUniforms));
+            SDL_PushGPUFragmentUniformData(cmd, 0, &sky_draws[i].uniforms,
+                                           sizeof(BodyUniforms));
+            const GpuMesh &mesh = renderer.meshes[static_cast<size_t>(sky_draws[i].mesh)];
+            SDL_DrawGPUIndexedPrimitives(pass, mesh.index_count, 1, mesh.first_index,
+                                         mesh.vertex_offset, static_cast<Uint32>(i));
+        }
+    };
     if (!sky_draws.empty()) {
         SDL_GPUBufferBinding sky_bindings[2]{};
         sky_bindings[0] = {renderer.mesh_vertices, 0};
         sky_bindings[1] = {renderer.body_instances.buffer, 0};
         SDL_BindGPUVertexBuffers(pass, 0, sky_bindings, 2);
-        const auto draw_sky = [&](SDL_GPUGraphicsPipeline *pipeline, bool shell, bool star,
-                                  Uint32 samplers) {
-            int drawn = 0;
-            for (size_t i = 0; i < sky_draws.size(); ++i) {
-                if (sky_draws[i].shell != shell || sky_draws[i].star != star) continue;
-                if (drawn == 0) SDL_BindGPUGraphicsPipeline(pass, pipeline);
-                ++drawn;
-                // A body samples the maps its system file named, and the white texel for every
-                // slot it did not, so the shader's flag decides and the sampler is never a hole.
-                if (samplers > 0) {
-                    SDL_GPUTextureSamplerBinding bindings[3]{};
-                    for (Uint32 slot = 0; slot < samplers; ++slot) {
-                        bindings[slot] = {
-                            sky_draws[i].maps[slot] ? sky_draws[i].maps[slot] : renderer.white,
-                            sky_draws[i].tile ? renderer.map_sampler_tile
-                                              : renderer.map_sampler_equirect};
-                    }
-                    SDL_BindGPUFragmentSamplers(pass, 0, bindings, samplers);
-                }
-                SDL_PushGPUVertexUniformData(cmd, 0, &sky_draws[i].uniforms,
-                                             sizeof(BodyUniforms));
-                SDL_PushGPUFragmentUniformData(cmd, 0, &sky_draws[i].uniforms,
-                                               sizeof(BodyUniforms));
-                const GpuMesh &mesh = renderer.meshes[static_cast<size_t>(sky_draws[i].mesh)];
-                SDL_DrawGPUIndexedPrimitives(pass, mesh.index_count, 1, mesh.first_index,
-                                             mesh.vertex_offset, static_cast<Uint32>(i));
-            }
-        };
-        draw_sky(set.planet, false, false, 3);
-        draw_sky(set.air, true, false, 0);
-        draw_sky(set.star, false, true, 1);
+        draw_sky(set.planet, false, false, 3, false);
+        draw_sky(set.air, true, false, 0, false);
+        draw_sky(set.star, false, true, 1, false);
         SDL_BindGPUVertexBuffers(pass, 0, vertex_bindings, 2);
     }
 
@@ -982,6 +994,22 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
         SDL_BindGPUGraphicsPipeline(pass, set.backdrop);
         draw_runs(backdrop_runs, false);
     }
+    // The deep set (plan 05 s2.3): bodies beyond `far`, re-projected onto a shell just inside it by
+    // the scene builder, drawn last so the depth buffer alone decides occlusion - a nearer hull
+    // wins the test, and the shell only shows where nothing nearer wrote depth. That is the same
+    // contract the plan's "deep pass, then clear depth" ordering buys, without a second resolve of
+    // the multisample target. Re-projection preserves direction and angular size exactly, so an
+    // object crossing `far` jumps in neither position nor size.
+    if (!sky_draws.empty()) {
+        SDL_GPUBufferBinding deep_bindings[2]{};
+        deep_bindings[0] = {renderer.mesh_vertices, 0};
+        deep_bindings[1] = {renderer.body_instances.buffer, 0};
+        SDL_BindGPUVertexBuffers(pass, 0, deep_bindings, 2);
+    }
+    draw_sky(set.planet, false, false, 3, true);
+    draw_sky(set.air, true, false, 0, true);
+    draw_sky(set.star, false, true, 1, true);
+    SDL_BindGPUVertexBuffers(pass, 0, vertex_bindings, 2);
     SDL_EndGPURenderPass(pass);
 
     // ------------------------------------------------------------------ the bloom chain
@@ -1018,7 +1046,10 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
     };
 
     BloomUniforms bloom{};
-    bloom.params = glm::vec4(1.0f, 0.5f, 1.0f, 0.0f);
+    // The threshold sits above one because an additive stack of hull lights lands near one: the
+    // chain is for genuinely HDR sources - the star and the drive flames (G5) - and a threshold at
+    // one put the whole frame's soft glow into the widest mips, washing the sky (plan 05 S-1).
+    bloom.params = glm::vec4(1.15f, 0.5f, 1.0f, 0.0f);
     bloom.texel = glm::vec4(1.0f / static_cast<float>(width), 1.0f / static_cast<float>(height),
                             1.0f / static_cast<float>(renderer.bloom_width[0]),
                             1.0f / static_cast<float>(renderer.bloom_height[0]));
@@ -1038,7 +1069,9 @@ void draw_frame(Renderer &renderer, TextEngine &text, SDL_GPUCommandBuffer *cmd,
         BloomUniforms up{};
         // Additive: each level is added into the one above it, and the strength keeps the sum from
         // running away as five haloes stack.
-        up.params = glm::vec4(bloom.params.x, bloom.params.y, 0.75f, 0.0f);
+        // The upsample strength decays a level at a time: a wide mip is a screen-wide wash, and
+        // the wash is what turned a hull's own glow into ambient light (plan 05 S-1).
+        up.params = glm::vec4(bloom.params.x, bloom.params.y, 0.75f * std::pow(0.8f, static_cast<float>(mip - 1)), 0.0f);
         up.texel = glm::vec4(1.0f / static_cast<float>(renderer.bloom_width[mip]),
                              1.0f / static_cast<float>(renderer.bloom_height[mip]),
                              1.0f / static_cast<float>(renderer.bloom_width[mip - 1]),

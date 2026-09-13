@@ -57,6 +57,12 @@ struct SkyBody {
     std::string night_map;
     std::string photosphere_map;
     BodyKind kind = BodyKind::Planet;
+    /**
+     * Beyond the far plane (plan 05 s2.3): the scene builder has already re-projected this body
+     * onto a shell just inside it, exactly, and the renderer draws the deep set in its own pass
+     * before the near pass clears depth.
+     */
+    bool deep = false;
 };
 
 /** Collects instances, remembering which mesh each one belongs to. */
@@ -86,8 +92,14 @@ struct SceneBuilder {
                    float scale, bool effects, float thrust, const glm::vec3 &tint = glm::vec3(1.0f),
                    const glm::vec4 &rcs_jets = glm::vec4(0.0f));
 
-    /** Drops this frame's instances, keeping the capacity for the next one. */
+    /**
+     * Drops this frame's instances, keeping the capacity for the next one. The LOD hysteresis
+     * memory lives with the app - it is view state that outlives a frame.
+     */
     void clear();
+
+    /** True when no instance was placed this frame - the empty scene the renderer still draws. */
+    bool empty() const { return instances.empty() && bodies.empty(); }
 
     /**
      * Groups the instance list by (layer, mesh) so each mesh is one indexed draw, in pass order:

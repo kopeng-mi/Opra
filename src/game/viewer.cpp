@@ -103,7 +103,8 @@ Camera Viewer::camera(const ModelSet &models, Uint32 width, Uint32 height) const
     out.target = glm::vec3(0.0f);
     // D-11/E5: the eye distance is derived from the framing the wheel asks for, so the zoom is real
     // and the turntable keeps the model the same size in a perspective view.
-    out.eye = forward * (out.half_height / std::tan(CAMERA_FOV_Y * 0.5f));
+    out.eye = forward *
+              static_cast<float>(out.half_height / std::tan(static_cast<double>(CAMERA_FOV_Y) * 0.5));
     return out;
 }
 
@@ -147,16 +148,22 @@ void build_viewer_scene(SceneBuilder &scene, const ModelSet &models, const Viewe
                     glm::vec3(1.0f), glm::vec4(viewer.effects ? 1.0f : 0.0f));
 
     if (viewer.grid) {
-        const float span = std::max(20.0f, model_extent(meta) * 2.0f);
-        const int half = static_cast<int>(span / 10.0f);
+        // A ground grid the model stands on (S-4): centred under it, at its keel, sized to it, so
+        // a turntable drag reads as a floor rather than as lines receding diagonally off one side.
+        const float extent = model_extent(meta);
+        const float span = std::max(20.0f, extent * 3.0f);
+        const float cell = span >= 60.0f ? 10.0f : span >= 24.0f ? 5.0f : 2.0f;
+        const float floor_z = meta.aabb_min.z - 0.5f;
+        const int half = static_cast<int>(span / cell);
+        const float reach = static_cast<float>(half) * cell;
         for (int i = -half; i <= half; ++i) {
-            const float at = static_cast<float>(i) * 10.0f;
+            const float at = static_cast<float>(i) * cell;
             const bool axis = i == 0;
             const glm::vec3 color = axis ? glm::vec3(0.45f, 0.55f, 0.62f) : glm::vec3(0.22f, 0.27f, 0.31f);
-            scene.add(cube, glm::vec3(at, 0.0f, -40.0f), glm::quat(1, 0, 0, 0),
-                      glm::vec3(0.12f, 80.0f, 0.12f), color);
-            scene.add(cube, glm::vec3(0.0f, at, -40.0f), glm::quat(1, 0, 0, 0),
-                      glm::vec3(80.0f, 0.12f, 0.12f), color);
+            scene.add(cube, glm::vec3(at, 0.0f, floor_z), glm::quat(1, 0, 0, 0),
+                      glm::vec3(0.12f, reach * 2.0f, 0.12f), color);
+            scene.add(cube, glm::vec3(0.0f, at, floor_z), glm::quat(1, 0, 0, 0),
+                      glm::vec3(reach * 2.0f, 0.12f, 0.12f), color);
         }
     }
 

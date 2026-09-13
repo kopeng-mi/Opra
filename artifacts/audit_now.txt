@@ -1,0 +1,406 @@
+legibility audit (plan 05 s3):
+beacon   39.6 m   119 px at home framing
+  triangles        3372 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.34)
+  material regions, plan-view area:
+    metal-mapped    2322 px2  45%
+    dark-mapped     1791 px2  35%
+    lightArmor-mapped   490 px2  10%
+    copper-mapped    278 px2   5%
+                      98 px2   2%
+    black-mapped      86 px2   2%
+                      53 px2   1%   FAIL      below 54 px2 minimum
+  material  is 5.9 m2, under the 6 m2 minimum
+                      23 px2   0%   FAIL      below 54 px2 minimum
+  material  is 2.6 m2, under the 6 m2 minimum
+  complexity       96.4 ok   (perimeter^2/area >= 22)
+cargo   22.9 m   69 px at home framing
+  triangles        1004 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.13)
+  material regions, plan-view area:
+    hullPaint-mapped  1313 px2  57%
+    metal-mapped     447 px2  20%
+    frame-mapped     244 px2  11%
+    black-mapped     233 px2  10%
+    hazardPaint-mapped    23 px2   1%   FAIL      below 54 px2 minimum
+  material hazardPaint-mapped is 2.6 m2, under the 6 m2 minimum
+    dark-mapped       23 px2   1%   FAIL      below 54 px2 minimum
+  material dark-mapped is 2.6 m2, under the 6 m2 minimum
+    glass              4 px2   0%   FAIL      below 54 px2 minimum
+  material glass is 0.4 m2, under the 6 m2 minimum
+    copper-mapped      1 px2   0%   FAIL      below 54 px2 minimum
+  material copper-mapped is 0.1 m2, under the 6 m2 minimum
+  complexity       31.9 ok   (perimeter^2/area >= 22)
+cargo_pod   18.2 m   55 px at home framing
+  triangles        776 ok   (budget 6000)
+  smallest feature 1.56 m = 4.7 px ok   (min 1.5 m, in part.36)
+  material regions, plan-view area:
+    metal-mapped    1171 px2  54%
+    frame-mapped     836 px2  39%
+    dark-mapped       82 px2   4%
+    black-mapped      70 px2   3%
+    hazardPaint-mapped    10 px2   0%   FAIL      below 54 px2 minimum
+  material hazardPaint-mapped is 1.1 m2, under the 6 m2 minimum
+  complexity       26.1 ok   (perimeter^2/area >= 22)
+derelict   160.0 m   480 px at home framing
+  triangles        2572 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.62)
+  material regions, plan-view area:
+    metal-mapped   16419 px2  39%
+    armor-mapped    8369 px2  20%
+    dark-mapped     4949 px2  12%
+    material-mapped  4861 px2  12%
+    lightArmor-mapped  4073 px2  10%
+    frame-mapped    1838 px2   4%
+    teal-mapped      486 px2   1%
+    black-mapped     342 px2   1%
+    ochre-mapped     324 px2   1%
+    material-mapped    65 px2   0%
+    glass             32 px2   0%   FAIL      below 54 px2 minimum
+  material glass is 3.6 m2, under the 6 m2 minimum
+    copper-mapped     13 px2   0%   FAIL      below 54 px2 minimum
+  material copper-mapped is 1.4 m2, under the 6 m2 minimum
+  complexity       159.4 ok   (perimeter^2/area >= 22)
+docking_collar   9.9 m   30 px at home framing
+  triangles        932 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.18)
+  material regions, plan-view area:
+    umbilicalGlass   460 px2  50%
+    copper-mapped    428 px2  47%
+    hazardPaint-mapped    25 px2   3%   FAIL      below 54 px2 minimum
+  material hazardPaint-mapped is 2.8 m2, under the 6 m2 minimum
+    metal-mapped       1 px2   0%   FAIL      below 54 px2 minimum
+  material metal-mapped is 0.1 m2, under the 6 m2 minimum
+  complexity       34.7 ok   (perimeter^2/area >= 22)
+drive_aux   23.4 m   70 px at home framing
+  triangles        1280 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.29)
+  material regions, plan-view area:
+    metal-mapped    1001 px2  75%
+    ignition         180 px2  13%
+    copper-mapped     97 px2   7%
+    dark-mapped       36 px2   3%   FAIL      below 54 px2 minimum
+  material dark-mapped is 4.0 m2, under the 6 m2 minimum
+    frame-mapped      23 px2   2%   FAIL      below 54 px2 minimum
+  material frame-mapped is 2.6 m2, under the 6 m2 minimum
+  complexity       34.3 ok   (perimeter^2/area >= 22)
+drive_main   39.0 m   117 px at home framing
+  triangles        3348 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.15)
+  material regions, plan-view area:
+    metal-mapped    2660 px2  81%
+    ignition         265 px2   8%
+    copper-mapped    215 px2   7%
+    frame-mapped      95 px2   3%
+    dark-mapped       56 px2   2%
+  complexity       57.2 ok   (perimeter^2/area >= 22)
+hab_module   33.4 m   100 px at home framing
+  triangles        3272 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.6)
+  material regions, plan-view area:
+    frame-mapped    7069 px2  67%
+    metal-mapped    3275 px2  31%
+    copper-mapped    156 px2   1%
+  complexity       16.0 ok   (perimeter^2/area >= 22)
+hull_cargo   27.7 m   83 px at home framing
+  triangles        2516 ok   (budget 6000)
+  smallest feature 1.83 m = 5.5 px ok   (min 1.5 m, in part.16)
+  material regions, plan-view area:
+    dark-mapped     1421 px2  40%
+    metal-mapped    1109 px2  31%
+    hazardPaint-mapped   680 px2  19%
+    copper-mapped    307 px2   9%
+    frame-mapped      16 px2   0%   FAIL      below 54 px2 minimum
+  material frame-mapped is 1.8 m2, under the 6 m2 minimum
+  complexity       45.3 ok   (perimeter^2/area >= 22)
+hull_truss   2343.4 m   7030 px at home framing
+  triangles        4176 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.6)
+  material regions, plan-view area:
+    frame-mapped   949050 px2  100%
+  complexity       216.4 ok   (perimeter^2/area >= 22)
+kestrel   47.4 m   142 px at home framing
+  triangles        1464 ok   (budget 1500)
+  smallest feature 1.56 m = 4.7 px ok   (min 1.5 m, in part.9)
+  material regions, plan-view area:
+    lightArmor-mapped  3848 px2  60%
+    armor-mapped    1198 px2  19%
+    ochre-mapped     528 px2   8%
+    teal-mapped      480 px2   8%
+    dark-mapped      240 px2   4%
+    frame-mapped      72 px2   1%
+  complexity       25.9 ok   (perimeter^2/area >= 22)
+kestrel_blocky   47.4 m   142 px at home framing
+  triangles        280 ok   (budget 6000)
+  smallest feature 1.56 m = 4.7 px ok   (min 1.5 m, in part.1)
+  material regions, plan-view area:
+    armor-mapped    4805 px2  79%
+    ochre-mapped     473 px2   8%
+    teal-mapped      473 px2   8%
+    dark-mapped      361 px2   6%
+  complexity       27.8 ok   (perimeter^2/area >= 22)
+landing_leg   14.6 m   44 px at home framing
+  triangles        728 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.9)
+  material regions, plan-view area:
+    frame-mapped     664 px2  63%
+    metal-mapped     362 px2  35%
+    dark-mapped       20 px2   2%   FAIL      below 54 px2 minimum
+  material dark-mapped is 2.2 m2, under the 6 m2 minimum
+  complexity       33.8 ok   (perimeter^2/area >= 22)
+landing_pad   52.5 m   158 px at home framing
+  triangles        3556 ok   (budget 6000)
+  smallest feature 1.54 m = 4.6 px ok   (min 1.5 m, in part.28)
+  material regions, plan-view area:
+    metal-mapped    6335 px2  41%
+    hazardPaint-mapped  4400 px2  28%
+    deckPlate-mapped  4175 px2  27%
+    dark-mapped      549 px2   4%
+    hullPaint-mapped    86 px2   1%
+                      38 px2   0%   FAIL      below 54 px2 minimum
+  material  is 4.2 m2, under the 6 m2 minimum
+                      28 px2   0%   FAIL      below 54 px2 minimum
+  material  is 3.1 m2, under the 6 m2 minimum
+  complexity       40.4 ok   (perimeter^2/area >= 22)
+mule   57.6 m   173 px at home framing
+  triangles        1300 ok   (budget 1500)
+  smallest feature 1.56 m = 4.7 px ok   (min 1.5 m, in part.2)
+  material regions, plan-view area:
+    dark-mapped     1967 px2  32%
+    lightArmor-mapped  1298 px2  21%
+    metal-mapped     906 px2  15%
+    frame-mapped     737 px2  12%
+    armor-mapped     728 px2  12%
+    copper-mapped    209 px2   3%
+    teal-mapped      154 px2   3%
+    ochre-mapped     101 px2   2%
+  complexity       489.5 ok   (perimeter^2/area >= 22)
+mule_blocky   60.0 m   180 px at home framing
+  triangles        248 ok   (budget 6000)
+  smallest feature 1.56 m = 4.7 px ok   (min 1.5 m, in part.5)
+  material regions, plan-view area:
+    armor-mapped    6004 px2  74%
+    metal-mapped    1243 px2  15%
+    dark-mapped      780 px2  10%
+    teal-mapped       64 px2   1%
+    ochre-mapped      57 px2   1%
+  complexity       60.1 ok   (perimeter^2/area >= 22)
+nav_buoy   48.3 m   145 px at home framing
+  triangles        1044 ok   (budget 6000)
+  smallest feature 1.62 m = 4.9 px ok   (min 1.5 m, in part.6)
+  material regions, plan-view area:
+    dark-mapped     2990 px2  32%
+    metal-mapped    2939 px2  32%
+    glass           1995 px2  21%
+    copper-mapped   1378 px2  15%
+  complexity       35.7 ok   (perimeter^2/area >= 22)
+needle   94.8 m   284 px at home framing
+  triangles        1500 ok   (budget 1500)
+  smallest feature 1.56 m = 4.7 px ok   (min 1.5 m, in part.11)
+  material regions, plan-view area:
+    ceramic-mapped  6556 px2  34%
+    dark-mapped     4216 px2  22%
+    lightArmor-mapped  3539 px2  18%
+    teal-mapped     1848 px2   9%
+    metal-mapped    1758 px2   9%
+    canopy-mapped    719 px2   4%
+    copper-mapped    460 px2   2%
+    ochre-mapped     196 px2   1%
+    black-mapped     108 px2   1%
+                      60 px2   0%
+    frame-mapped      59 px2   0%
+  complexity       86.6 ok   (perimeter^2/area >= 22)
+needle_blocky   94.0 m   282 px at home framing
+  triangles        156 ok   (budget 6000)
+  smallest feature 1.60 m = 4.8 px ok   (min 1.5 m, in part.2)
+  material regions, plan-view area:
+    ceramic-mapped 11259 px2  72%
+    teal-mapped     2022 px2  13%
+    metal-mapped    1445 px2   9%
+    dark-mapped      741 px2   5%
+    ochre-mapped     222 px2   1%
+  complexity       93.9 ok   (perimeter^2/area >= 22)
+ore   13.5 m   41 px at home framing
+  triangles        872 ok   (budget 6000)
+  smallest feature 1.63 m = 4.9 px ok   (min 1.5 m, in part.12)
+  material regions, plan-view area:
+    oreShell-mapped   922 px2  70%
+    oreVein          302 px2  23%
+    crust-mapped      91 px2   7%
+    ceramic-mapped    11 px2   1%   FAIL      below 54 px2 minimum
+  material ceramic-mapped is 1.2 m2, under the 6 m2 minimum
+  complexity       20.3 ok   (perimeter^2/area >= 22)
+pdc_turret   39.0 m   117 px at home framing
+  triangles        1304 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.15)
+  material regions, plan-view area:
+    metal-mapped    1404 px2  61%
+    ochre-mapped     840 px2  36%
+    copper-mapped     62 px2   3%
+  complexity       49.5 ok   (perimeter^2/area >= 22)
+probe_scanner   15.8 m   47 px at home framing
+  triangles        986 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.19)
+  material regions, plan-view area:
+    hazardPaint-mapped   576 px2  45%
+    metal-mapped     384 px2  30%
+    solarCell        170 px2  13%
+    dark-mapped      135 px2  11%
+    glass              5 px2   0%   FAIL      below 54 px2 minimum
+  material glass is 0.6 m2, under the 6 m2 minimum
+  complexity       44.6 ok   (perimeter^2/area >= 22)
+radiator_panel   16.3 m   49 px at home framing
+  triangles        596 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.3)
+  material regions, plan-view area:
+    copper-mapped    712 px2  48%
+    metal-mapped     259 px2  18%
+    frame-mapped     212 px2  14%
+    dark-mapped      157 px2  11%
+    insulation-mapped   136 px2   9%
+  complexity       25.5 ok   (perimeter^2/area >= 22)
+rcs_block   16.7 m   50 px at home framing
+  triangles        652 ok   (budget 6000)
+  smallest feature 1.80 m = 5.4 px ok   (min 1.5 m, in part.0)
+  material regions, plan-view area:
+    metal-mapped    1053 px2  41%
+    copper-mapped    852 px2  33%
+    dark-mapped      350 px2  14%
+    lightArmor-mapped   295 px2  12%
+  complexity       28.6 ok   (perimeter^2/area >= 22)
+satellite_relay   20.8 m   62 px at home framing
+  triangles        1684 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.21)
+  material regions, plan-view area:
+    dark-mapped     1523 px2  50%
+    copper-mapped    749 px2  25%
+    metal-mapped     425 px2  14%
+    solarCell        269 px2   9%
+    frame-mapped      57 px2   2%
+  complexity       36.5 ok   (perimeter^2/area >= 22)
+sensor_mast   19.5 m   59 px at home framing
+  triangles        852 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.17)
+  material regions, plan-view area:
+    lightArmor-mapped  1600 px2  93%
+    dark-mapped      104 px2   6%
+    metal-mapped       8 px2   0%   FAIL      below 54 px2 minimum
+  material metal-mapped is 0.9 m2, under the 6 m2 minimum
+    copper-mapped      1 px2   0%   FAIL      below 54 px2 minimum
+  material copper-mapped is 0.1 m2, under the 6 m2 minimum
+  complexity       22.9 ok   (perimeter^2/area >= 22)
+station   137.3 m   412 px at home framing
+  triangles        23292 FAIL   (budget 6000)
+  triangles 23292 over the 6000 budget
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.259)
+  material regions, plan-view area:
+    frame-mapped   259507 px2  83%
+    hullPaint-mapped 45176 px2  14%
+    lightArmor-mapped  2141 px2   1%
+    insulation-mapped  2043 px2   1%
+    metal-mapped    1501 px2   0%
+    deckPlate-mapped  1203 px2   0%
+    copper-mapped    498 px2   0%
+    solarCell        216 px2   0%
+                     195 px2   0%
+                     108 px2   0%
+    ochre-mapped      22 px2   0%   FAIL      below 54 px2 minimum
+  material ochre-mapped is 2.4 m2, under the 6 m2 minimum
+                      21 px2   0%   FAIL      below 54 px2 minimum
+  material  is 2.3 m2, under the 6 m2 minimum
+  complexity       4247.4 ok   (perimeter^2/area >= 22)
+station_depot   2379.6 m   7139 px at home framing
+  triangles        6676 FAIL   (budget 6000)
+  triangles 6676 over the 6000 budget
+  smallest feature 1.60 m = 4.8 px ok   (min 1.5 m, in part.110)
+  material regions, plan-view area:
+    frame-mapped   334681 px2  94%
+    insulation-mapped  8514 px2   2%
+    dark-mapped     4664 px2   1%
+    copper-mapped   4463 px2   1%
+    metal-mapped    3705 px2   1%
+    lightArmor-mapped   440 px2   0%
+    solarCell        364 px2   0%
+    deckPlate-mapped   324 px2   0%
+                     126 px2   0%
+    hazardPaint-mapped    89 px2   0%
+  complexity       2834.3 ok   (perimeter^2/area >= 22)
+station_lagrange   2352.9 m   7059 px at home framing
+  triangles        21318 FAIL   (budget 6000)
+  triangles 21318 over the 6000 budget
+  smallest feature 1.58 m = 4.7 px ok   (min 1.5 m, in part.729)
+  material regions, plan-view area:
+    frame-mapped   501281 px2  89%
+    hullPaint-mapped 43457 px2   8%
+    dark-mapped     4652 px2   1%
+    insulation-mapped  2907 px2   1%
+    armor-mapped    2592 px2   0%
+    deckPlate-mapped  2341 px2   0%
+    metal-mapped    2187 px2   0%
+    ochre-mapped    1683 px2   0%
+    lightArmor-mapped  1160 px2   0%
+    copper-mapped    325 px2   0%
+    teal-mapped      105 px2   0%
+                      75 px2   0%
+                      46 px2   0%   FAIL      below 54 px2 minimum
+  material  is 5.1 m2, under the 6 m2 minimum
+                      28 px2   0%   FAIL      below 54 px2 minimum
+  material  is 3.1 m2, under the 6 m2 minimum
+  complexity       7226.5 ok   (perimeter^2/area >= 22)
+surface_base   2384.2 m   7153 px at home framing
+  triangles        22156 FAIL   (budget 6000)
+  triangles 22156 over the 6000 budget
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.179)
+  material regions, plan-view area:
+    frame-mapped   327764 px2  57%
+    deckPlate-mapped 121825 px2  21%
+    dark-mapped    87551 px2  15%
+    hazardPaint-mapped 16914 px2   3%
+    metal-mapped    8262 px2   1%
+    insulation-mapped  5199 px2   1%
+    copper-mapped   2758 px2   0%
+    hullPaint-mapped  2326 px2   0%
+                     275 px2   0%
+    glass            191 px2   0%
+                     118 px2   0%
+                      37 px2   0%   FAIL      below 54 px2 minimum
+  material  is 4.1 m2, under the 6 m2 minimum
+                      12 px2   0%   FAIL      below 54 px2 minimum
+  material  is 1.3 m2, under the 6 m2 minimum
+  complexity       426.5 ok   (perimeter^2/area >= 22)
+tank_large   16.1 m   48 px at home framing
+  triangles        856 ok   (budget 6000)
+  smallest feature 1.56 m = 4.7 px ok   (min 1.5 m, in part.24)
+  material regions, plan-view area:
+    deckPlate-mapped   523 px2  32%
+    dark-mapped      309 px2  19%
+    copper-mapped    302 px2  19%
+    metal-mapped     296 px2  18%
+    hazardPaint-mapped   103 px2   6%
+    frame-mapped      56 px2   3%
+    insulation-mapped    30 px2   2%   FAIL      below 54 px2 minimum
+  material insulation-mapped is 3.3 m2, under the 6 m2 minimum
+    black-mapped       2 px2   0%   FAIL      below 54 px2 minimum
+  material black-mapped is 0.2 m2, under the 6 m2 minimum
+  complexity       28.3 ok   (perimeter^2/area >= 22)
+tank_small   27.8 m   83 px at home framing
+  triangles        2792 ok   (budget 6000)
+  smallest feature 1.53 m = 4.6 px ok   (min 1.5 m, in part.6)
+  material regions, plan-view area:
+    metal-mapped    2433 px2  70%
+    hazardPaint-mapped   611 px2  17%
+    copper-mapped    395 px2  11%
+    frame-mapped      54 px2   2%
+  complexity       33.5 ok   (perimeter^2/area >= 22)
+torpedo_tube   25.1 m   75 px at home framing
+  triangles        1664 ok   (budget 6000)
+  smallest feature 1.67 m = 5.0 px ok   (min 1.5 m, in part.17)
+  material regions, plan-view area:
+    metal-mapped    2696 px2  98%
+    copper-mapped     46 px2   2%   FAIL      below 54 px2 minimum
+  material copper-mapped is 5.1 m2, under the 6 m2 minimum
+  complexity       27.0 ok   (perimeter^2/area >= 22)
+  IoU kestrel/mule   0.50 ok
+  IoU kestrel/needle   0.56 ok
+  IoU mule/needle   0.41 ok
+audit: 18 model(s) fail

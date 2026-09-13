@@ -449,8 +449,8 @@ int run_tape(App &app, const char *name, const char *json_path) {
     app.settings = Settings{};
     app.apply_settings();
     app.settings_dirty = false;
-    app.zoom = app.settings.zoom_default;
-    app.zoom_current = app.zoom;
+    app.half_height = HOME_HALF;
+    app.half_height_current = app.half_height;
     app.world.ship.assist = app.settings.assist;
 
     SDL_GPUTexture *target =

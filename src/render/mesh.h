@@ -55,6 +55,8 @@ MeshData asteroid(float radius, int seed, int tile_index);
 MeshData ore_chunk();
 /** Unit disc in the local XY plane: bright at the centre, black at the rim. Nebula wash. */
 MeshData nebula_disc(int segments);
+/** A soft additive light: the falloff reaches zero at the rim, so an additive draw has no edge. */
+MeshData glow_disc(int segments);
 
 }  // namespace meshes
 

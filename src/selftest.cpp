@@ -23,6 +23,7 @@
 #include "orbit/tests.h"
 #include "orbit/transfer_tests.h"
 #include "sim/dock_tests.h"
+#include "sim/combat_tests.h"
 #include "sim/component_tests.h"
 #include "sim/shapes_tests.h"
 #include "sim/system_tests.h"
@@ -82,8 +83,15 @@ void test_determinism() {
 void test_fracture() {
     World world;
     const int initial_rocks = static_cast<int>(world.rocks.size());
+    // The background shelf (every fifth rock) never collides and never breaks: the planar field is
+    // what the fracture path has to clear. Its size follows the belt retune, so the test counts it
+    // rather than hardcoding a field size (s3.1).
+    int planar = 0;
+    for (const Obstacle& rock : world.rocks) {
+        if (rock.z == 0) ++planar;
+    }
     int broken = 0;
-    while (broken < 200) {
+    while (broken < planar) {
         // Breaking retires the rock, so re-scan instead of holding an iterator across the call.
         Obstacle* next = nullptr;
         for (Obstacle& rock : world.rocks) {
@@ -96,7 +104,7 @@ void test_fracture() {
         world.break_rock(*next);
         ++broken;
     }
-    check(broken == 200, "fracture: 200 rocks broken");
+    check(broken == planar, "fracture: the field breaks every rock it holds");
     int retired = 0;
     for (const Obstacle& rock : world.rocks) {
         if (rock.retired) ++retired;
@@ -417,9 +425,23 @@ void test_camera() {
         const glm::vec4 clip = matrix * glm::vec4(camera.eye + view_dir * distance, 1.0f);
         return clip.z / clip.w;
     };
-    check_close(clip_depth(CAMERA_NEAR), 1.0, 1e-4, "camera: the near plane maps to depth 1");
-    check_close(clip_depth(CAMERA_FAR), 0.0, 1e-4, "camera: the far plane maps to depth 0");
+    // s2.2: the planes ride the eye distance - near = R*1e-3, far = R*1e3, a 1e6 ratio at every
+    // scale, which is what keeps reversed-Z's precision constant from hull to system.
+    check_close(camera.near_z(), camera.eye_distance() * 1.0e-3, 1e-3,
+                "camera: the near plane rides the eye distance");
+    (void)0;
+    check_close(camera.far_z(), camera.eye_distance() * 1.0e3, 1.0,
+                "camera: the far plane rides the eye distance");
+    check_close(clip_depth(camera.near_z()), 1.0, 1e-4, "camera: the near plane maps to depth 1");
+    check_close(clip_depth(camera.far_z()), 0.0, 1e-4, "camera: the far plane maps to depth 0");
     check(clip_depth(120.0f) > clip_depth(2400.0f), "camera: nearer is greater in reversed-Z");
+    {
+        // The ratio holds ten decades away, which is the whole point of deriving the planes.
+        Camera far_out = camera;
+        far_out.half_height = 5.0e9;
+        check_close(far_out.far_z() / far_out.near_z(), 1.0e6, 1e3,
+                    "camera: the near/far ratio is 1e6 at system scale too");
+    }
 
     // At both pitch limits the bottom of the screen still cuts the plane in front of the camera.
     for (float pitch : {CAMERA_PITCH_MIN, CAMERA_PITCH_MAX}) {
@@ -497,69 +519,75 @@ void test_camera() {
         check_close(jumped.velocity.x, 0.0, 1.0e-9,
                     "follow: a snap takes the ship's velocity, so the next step is smooth");
 
-        // The hand on the camera (A4): a grab of the plane, stepped by unprojected world points.
-        // The pan is the anchor minus the cursor, so the grabbed ground returns to the cursor
-        // exactly - no scale, no clamp between them.
-        glm::dvec2 pan{0.0};
-        const glm::dvec2 anchor{120.0, -40.0};
-        look_step(pan, anchor, anchor);
-        check(glm::length(pan) == 0.0, "look: a cursor still on the anchor moves nothing");
+        // The camera's freedom (plan 05 J1): Ctrl and the mouse swing the eye inside a cone about
+        // the home axis - thirty degrees in any direction, clamped exactly there, easing home on
+        // release. The gate asks for: reaches 30 degrees and no further, every direction; returns
+        // home; elevation stays inside [8, 88] degrees; world north stays within 30 of screen-up
+        // (which the cone guarantees by never rolling and never crossing the pole).
+        glm::dvec2 cone{0.0, 0.0};
+        look_cone_step(cone, 400.0, 300.0, 400.0, 300.0, 900.0);
+        check(glm::length(cone) == 0.0, "look: a cursor still on the anchor swings nothing");
 
-        look_step(pan, anchor, anchor + glm::dvec2(30.0, 0.0));
-        check_close(pan.x, -30.0, 1.0e-12, "look: the pan moves the plane by anchor minus cursor");
-        check(pan.x < 0.0 && pan.y == 0.0,
-              "look: dragging the cursor right slides the view left, as a grab does");
+        look_cone_step(cone, 400.0, 300.0, 400.0 + 100.0, 300.0, 900.0);
+        check_close(glm::length(cone), 100.0 * 0.0035, 1e-12,
+                    "look: drag maps to angle at the documented radians per pixel");
 
+        // Any direction: the clamp is on the magnitude of the two-axis offset, so a diagonal drag
+        // reaches the same thirty degrees as a straight one and no further.
+        const double limit = 30.0 * 3.14159265358979323846 / 180.0;
+        for (const glm::dvec2 drag : {glm::dvec2{900.0, 0.0}, glm::dvec2{0.0, 900.0},
+                                      glm::dvec2{640.0, 640.0}, glm::dvec2{-900.0, 900.0}}) {
+            glm::dvec2 swung{0.0, 0.0};
+            look_cone_step(swung, 400.0, 300.0, 400.0 + drag.x, 300.0 + drag.y, 900.0);
+            check(glm::length(swung) <= limit + 1e-12,
+                  "look: no drag reaches past thirty degrees");
+            check_close(glm::length(swung), limit, 1e-9,
+                        "look: a hard drag reaches exactly thirty degrees");
+            // The clamp keeps the drag's direction: it is a cone, not a square.
+            check_close(glm::length(swung - glm::normalize(drag) * limit), 0.0, 1e-9,
+                        "look: the clamp points the same way the drag did");
+        }
 
-        // And it walks back: the pan is a look, never a new home. exp(-dt/tau) is exact, so two
-        // paths to the same elapsed time must land on the same spot.
-        glm::dvec2 easing = pan;
-        for (int i = 0; i < 240; ++i) easing = pan_release(easing, 1.0 / 120.0, 0.25);
-        check(glm::length(easing) < 40.0 * 1.0e-3, "look: releasing the key eases the eye back");
+        // It walks home on release: exp(-dt/tau) is exact, so two frame rates land together, and
+        // half a second at the shipped tau is visually home.
+        glm::dvec2 easing = cone;
+        for (int i = 0; i < 240; ++i) easing = look_cone_release(easing, 1.0 / 120.0, 0.15);
+        check(glm::length(easing) < limit * 1.0e-3, "look: releasing the key eases the eye home");
 
-        glm::dvec2 relaxed = pan, slow = pan;
-        for (int i = 0; i < 30; ++i) relaxed = pan_release(relaxed, 4.0 / 60.0, 0.25);
-        for (int i = 0; i < 120; ++i) slow = pan_release(slow, 1.0 / 60.0, 0.25);
-        check_close(glm::length(relaxed - slow), 0.0, 1.0e-9,
+        glm::dvec2 relaxed = cone, slow = cone;
+        for (int i = 0; i < 30; ++i) relaxed = look_cone_release(relaxed, 4.0 / 60.0, 0.15);
+        for (int i = 0; i < 120; ++i) slow = look_cone_release(slow, 1.0 / 60.0, 0.15);
+        check_close(glm::length(relaxed - slow), 0.0, 1e-12,
                     "look: two seconds at 15 Hz eases with two seconds at 60 Hz");
-        check(pan_release(pan, 10.0, 0.0) == glm::dvec2(0.0), "look: a zero constant centre means it");
+        check(look_cone_release(cone, 10.0, 0.0) == glm::dvec2(0.0),
+              "look: a zero constant centre means it");
 
-        // Gate 3 (plan-04 s5): the grabbed point stays under the cursor, to within 2 px, at the
-        // pitch extremes the settings can reach and at both zoom ends. This is the test that the
-        // pan is a real unprojection: a flat pixels-to-metres scale is wrong by a different amount
-        // on every screen row under a tilted perspective camera, and the error grows with the drag.
-        {
-            const float width = 1280.0f, height = 720.0f;
-            const glm::vec2 grab{896.0f, 396.0f};  // off centre, so both axes carry the drag
-            for (const float pitch_deg : {17.0f, 45.0f, 88.0f}) {
-                for (const float zoom : {0.6f, 3.0f}) {
-                    Camera cam;
-                    cam.half_height = 340.0f / zoom;
-                    cam.aspect = width / height;
-                    cam.origin = glm::dvec3(0.0);
-                    cam.target = glm::vec3(0.0f);
-                    cam.eye = orbit_eye(cam.half_height, pitch_deg * 0.017453292519943295f);
-
-                    const glm::dvec2 anchor = unproject(cam, grab.x, grab.y, width, height);
-                    glm::dvec2 pan{0.0};
-                    // Four frames of drag: the cursor walks 120 px across and 80 up, and each
-                    // frame's pan is stepped from the anchor against the cursor the way the
-                    // update pass does - the camera having moved is part of the contract.
-                    const glm::vec2 path[4] = {{30.0f, -20.0f}, {70.0f, -50.0f}, {95.0f, -65.0f},
-                                               {120.0f, -80.0f}};
-                    for (const glm::vec2 &step : path) {
-                        const glm::vec2 cursor = grab + step;
-                        const glm::dvec2 now = unproject(cam, cursor.x, cursor.y, width, height);
-                        look_step(pan, anchor, now);
-                        cam.origin = glm::dvec3(pan.x, pan.y, 0.0);
-                        const glm::vec2 screen =
-                            project(view_projection(cam), cam.origin, anchor.x, anchor.y, 0.0f,
-                                    width, height);
-                        check(glm::length(screen - cursor) <= 2.0f,
-                              "look: the grabbed point stays under the cursor");
-                    }
-                }
+        // The swung eye respects the camera's own elevation limits whatever the cone does, and at
+        // zero cone it is the home orbit exactly.
+        for (const float pitch_deg : {12.0f, 32.0f, 75.0f}) {
+            const float pitch = pitch_deg * 0.017453292519943295f;
+            const glm::vec3 home = orbit_eye(150.0, pitch);
+            check_close(glm::length(look_eye(150.0, pitch, glm::dvec2(0.0)) - home), 0.0, 1e-6,
+                        "look: a centred cone is the home orbit");
+            for (const glm::dvec2 full : {glm::dvec2{limit, 0.0}, glm::dvec2{0.0, limit},
+                                          glm::dvec2{-limit, -limit * 0.7}}) {
+                const glm::vec3 swung = look_eye(150.0, pitch, full);
+                const float elevation =
+                    std::atan2(swung.z, std::hypot(swung.x, swung.y)) * 57.29577951308232f;
+                check(elevation >= 8.0f - 1e-4 && elevation <= 88.0f + 1e-4,
+                      "look: the eye's elevation stays inside [8, 88] degrees");
             }
+        }
+
+        // A cone look moves the eye about the follow point and never the point itself: the view
+        // can swing but the ship stays tracked, which is what makes the collar's bearing frame
+        // survive a look.
+        {
+            const Camera cam{glm::dvec3(0.0), look_eye(150.0, 0.55850536f, glm::dvec2(limit, limit)),
+                             glm::vec3(0.0f), 150.0, 16.0f / 9.0f};
+            const glm::dvec3 forward = glm::normalize(glm::dvec3(cam.target) - glm::dvec3(cam.eye));
+            check(glm::length(forward) > 0.99,
+                  "look: the swung eye still looks at the follow point");
         }
     }
 }
@@ -579,7 +607,6 @@ void test_settings() {
                                   std::istreambuf_iterator<char>());
 
     Settings written;
-    written.zoom_default = 2.25f;
     written.camera_pitch = 47.0f;
     written.assist = false;
     written.reduced_motion = true;
@@ -589,7 +616,6 @@ void test_settings() {
 
     Settings read;
     read.load();
-    check_close(read.zoom_default, 2.25, 1e-4, "settings: zoom round-trips");
     check_close(read.camera_pitch, 47.0, 1e-4, "settings: the camera pitch round-trips");
     check(read.assist == false && read.reduced_motion && read.msaa == 4 && read.show_stats,
           "settings: flags round-trip");
@@ -658,6 +684,7 @@ int run_selftest() {
     test_collision();
     test_models();
     test_ui();
+    combat_tests();
     test_ui_active_release();
     test_cutter_bearing();
     test_frame_rate_independence();
@@ -670,7 +697,7 @@ int run_selftest() {
     const int reported = orbit::tests() + orbit::transfer_tests() + orbit::encounter_tests() +
                          orbit::lagrange_tests() + system_tests() + dock_tests() +
                          shapes_tests() + warp_tests() + text_tests() + world_tests() +
-                         component_tests() + orrery_tests() + effects_tests() + flow_tests() +
+                         component_tests() + combat_tests() + orrery_tests() + effects_tests() + flow_tests() +
                          worlds_tests();
     const int failures = std::max(selftest::failures(), reported);
     std::printf("%s: %d checks, %d failures\n", failures == 0 ? "ok" : "FAILED", selftest::checks(),

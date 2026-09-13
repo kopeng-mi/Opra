@@ -97,6 +97,8 @@ void parse_world_fields(const json &entry, Body &body, const SystemDef &system,
         body.photosphere_map = maps.value("photosphere", std::string{});
     }
 
+    body.tint = entry.value("color", std::string{});
+
     if (entry.contains("surface")) {
         const json &seat = entry["surface"];
         body.surface.present = true;
@@ -148,6 +150,7 @@ SystemDef load_system(const std::string &path) {
     if (star.contains("maps")) {
         anchor.photosphere_map = star["maps"].value("photosphere", std::string{});
     }
+    anchor.tint = star.value("color", std::string{});
     system.bodies.push_back(anchor);
 
     if (!root.contains("bodies") || !root["bodies"].is_array()) {

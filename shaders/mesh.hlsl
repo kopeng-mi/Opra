@@ -259,6 +259,15 @@ float4 PSMain(VSOut input) : SV_Target
  * hulls had before the PBR path existed. Flames and the nebula are light sources, not surfaces, and
  * running them through a BRDF would make a flame's brightness depend on the normal of a cone.
  */
+/** The flame pass is emissive (plan 05 S-1): an exhaust plume is its own light, and running it
+ *  through the star's lighting term made its brightness depend on which way the hull faced - a
+ *  plume that vanishes when the star is behind it. Colour in, additive out, HDR at the core. */
+float4 PSFlame(VSOut input) : SV_Target
+{
+    float3 rgb = input.color.rgb * input.color.a;
+    return float4(rgb, 1.0);
+}
+
 float4 PSAmbient(VSOut input) : SV_Target
 {
     float3 n = normalize(input.world_normal);

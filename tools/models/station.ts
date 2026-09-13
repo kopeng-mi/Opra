@@ -29,28 +29,28 @@ function berth(root: THREE.Object3D, id: string, x: number, y: number, rotation:
   site.position.set(x, y, 0);
   site.rotation.z = rotation;
   root.add(site);
-  tube(site, frame, 4.4, 4.9, 2.4, [0, 3.0, 0], 16);
-  torus(site, copper, 4.3, 0.35, [0, 5.6, 0], [Math.PI / 2, 0, 0], 5, 16);
-  tube(site, dark, 3.4, 3.4, 1.0, [0, 5.0, 0], 16);
+  tube(site, frame, 4.4, 4.9, 2.4, [0, 3.0, 0], 10);
+  torus(site, copper, 4.3, 0.35, [0, 5.6, 0], [Math.PI / 2, 0, 0], 4, 10);
+  tube(site, dark, 3.4, 3.4, 1.0, [0, 5.0, 0], 10);
   box(site, deckPlate, [8.6, 0.3, 0.3], [0, 7.6, 0]);
   for (let i = 0; i < 4; i++) {
     const angle = (i / 4) * TAU + Math.PI / 4;
     box(site, metal, [0.4, 0.5, 0.5], [Math.cos(angle) * 4.4, 5.6 + Math.sin(angle) * 4.4, 0], angle);
   }
   dock(site, id, [0, 5.6, 0], 0, cls);
-  lamps(site, '#b7dfdd', [[-3, 8, 0], [3, 8, 0], [-3, 12, 0], [3, 12, 0]], 0.5, 6);
-  lamps(site, '#e6554d', [[-3.6, 7.2, 0], [3.6, 7.2, 0]], 0.45, 6);
+  lamps(site, '#b7dfdd', [[-3, 8, 0], [3, 8, 0]], 0.5, 4);
+  lamps(site, '#e6554d', [[-3.6, 7.2, 0], [3.6, 7.2, 0]], 0.45, 4);
 }
 
 export function build(): THREE.Object3D {
   const group = new THREE.Group(); group.name = 'station';
 
   // Pressure torus in the gameplay plane, with rim modules and the identity bands.
-  torus(group, hullPaint, RING, TUBE, [0, 0, 0], [0, 0, 0], 12, 72);
+  torus(group, hullPaint, RING, TUBE, [0, 0, 0], [0, 0, 0], 8, 36);
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * TAU + TAU / 16;
     const x = Math.cos(angle) * RING, y = Math.sin(angle) * RING;
-    bevelled(group, lightArmor, [6.0, 5.0, 4.0], [x, y, TUBE + 1.0], [0, 0, angle], { radius: 0.5, segments: 1 });
+    box(group, lightArmor, [6.0, 5.0, 4.0], [x, y, TUBE + 1.0], angle);
     box(group, dark, [4.4, 0.4, 3.0], [x * 1.0, y * 1.0, -(TUBE + 0.6)], angle);
     box(group, teal, [3.2, 1.6, 0.5], [x, y, TUBE - 0.2], angle + Math.PI / 2);
   }
@@ -60,12 +60,12 @@ export function build(): THREE.Object3D {
   }
 
   // Hub: drum, cupolas and the four spherical tanks clustered round it.
-  tube(group, metal, 9.0, 9.0, 14.0, [0, 0, 0], 20, [Math.PI / 2, 0, 0]);
-  dome(group, hullPaint, 9.0, [0, 0, 7.0], [0, 0, 0], 20);
-  dome(group, hullPaint, 9.0, [0, 0, -7.0], [Math.PI, 0, 0], 20);
+  tube(group, metal, 9.0, 9.0, 14.0, [0, 0, 0], 12, [Math.PI / 2, 0, 0]);
+  dome(group, hullPaint, 9.0, [0, 0, 7.0], [0, 0, 0], 12);
+  dome(group, hullPaint, 9.0, [0, 0, -7.0], [Math.PI, 0, 0], 12);
   for (let i = 0; i < 4; i++) {
     const angle = (i / 4) * TAU + TAU / 8;
-    sphere(group, insulation, 4.2, [Math.cos(angle) * 13.5, Math.sin(angle) * 13.5, 0], 16, 12);
+    sphere(group, insulation, 4.2, [Math.cos(angle) * 13.5, Math.sin(angle) * 13.5, 0], 10, 8);
   }
 
   // Four spokes on the diagonals: hub to ring, cross-braced trusses.
@@ -76,14 +76,14 @@ export function build(): THREE.Object3D {
     spoke.position.set(dx * (RING / 2 + 6), dy * (RING / 2 + 6), 0);
     spoke.rotation.z = angle - Math.PI / 2;
     group.add(spoke);
-    truss_box(spoke, frame, RING - 20, 4.5, 4.5, 7, 0.5);
+    truss_box(spoke, frame, RING - 20, 4.5, 4.5, 3, 0.5);
   }
 
   // Spine: the truss through the axis, past the ring to the berth tips both ways.
   const spine = new THREE.Group();
   spine.rotation.z = Math.PI / 2;
   group.add(spine);
-  truss_box(spine, frame, SPINE_HALF * 2, 7.0, 7.0, 14, 0.7);
+  truss_box(spine, frame, SPINE_HALF * 2, 7.0, 7.0, 6, 0.7);
   // Spine service modules and tankage between hub and ring.
   for (const side of [-1, 1]) {
     box(group, metal, [22.0, 6.0, 6.0], [side * 38, 0, 0]);
@@ -106,14 +106,14 @@ export function build(): THREE.Object3D {
 
   // Approach lighting down the spine and strobes round the ring.
   const spineLights: number[][] = [];
-  for (let i = -4; i <= 4; i++) spineLights.push([i * 20, 4.5, 0]);
-  lamps(group, '#b7dfdd', spineLights, 0.5, 6);
+  for (let i = -2; i <= 2; i++) spineLights.push([i * 20, 4.5, 0]);
+  lamps(group, '#b7dfdd', spineLights, 0.5, 4);
   const ringStrobes: number[][] = [];
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * TAU;
     ringStrobes.push([Math.cos(angle) * (RING + TUBE + 0.5), Math.sin(angle) * (RING + TUBE + 0.5), 0]);
   }
-  lamps(group, '#e8c98a', ringStrobes, 0.5, 6);
+  lamps(group, '#e8c98a', ringStrobes, 0.5, 4);
   return group;
 }
 

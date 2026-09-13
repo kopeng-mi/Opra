@@ -25,6 +25,10 @@ void ModelSet::build(const std::string &manifest_path) {
     star_mesh = library.get("star", []() { return meshes::cube(); });
     sky_mesh = library.get("sky", []() { return meshes::icosahedron(0.5f, 0); });
     nebula_mesh = library.get("nebula", []() { return meshes::nebula_disc(48); });
+    glow_mesh = library.get("glow", []() { return meshes::glow_disc(24); });
+    // The flight view's sky bodies draw with the same sphere the orrery's chart does: one key, so
+    // whichever builder runs first owns the mesh and the other reuses it.
+    planet_mesh = library.get("planet", []() { return meshes::icosahedron(1.0f, 4); });
     // Every rock bucket the field can ask for, resolved before the upload so no mesh is created
     // after the GPU buffers exist.
     for (int bucket = 1; bucket <= 12; ++bucket) {

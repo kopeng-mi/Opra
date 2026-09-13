@@ -4,30 +4,30 @@
   "aabb": {
     "min": [
       -22.717,
-      -46.05,
-      -12.8
+      -46.75,
+      -11.15
     ],
     "max": [
       22.717,
       48,
-      12.26
+      12
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -23,
+      -22.717,
       -82,
-      -12.8
+      -11.15
     ],
     "max": [
-      23,
+      22.717,
       48,
-      12.26
+      12
     ]
   },
   "collider": {
-    "halfLength": 62,
-    "halfWidth": 27,
+    "halfLength": 47.375,
+    "halfWidth": 22.717,
     "shapes": [
       {
         "kind": "box",
@@ -49,7 +49,7 @@
         ],
         "angle": 0,
         "half": [
-          5.9389,
+          6,
           28.75
         ]
       },
@@ -85,7 +85,7 @@
         ],
         "angle": 0,
         "half": [
-          8,
+          7.6085,
           10.2
         ]
       },
@@ -93,12 +93,12 @@
         "kind": "box",
         "pos": [
           0,
-          29
+          36
         ],
         "angle": 0,
         "half": [
-          4.5301,
-          19
+          4.6,
+          12
         ]
       },
       {
@@ -170,7 +170,7 @@
     {
       "node": "rcs-jet",
       "pos": [
-        -14,
+        -12.4,
         14,
         2
       ]
@@ -178,7 +178,7 @@
     {
       "node": "rcs-jet",
       "pos": [
-        -14,
+        -12.4,
         -24,
         2
       ]
@@ -186,7 +186,7 @@
     {
       "node": "rcs-jet",
       "pos": [
-        14,
+        12.4,
         14,
         2
       ]
@@ -194,7 +194,7 @@
     {
       "node": "rcs-jet",
       "pos": [
-        14,
+        12.4,
         -24,
         2
       ]
@@ -209,12 +209,12 @@
       "roughness": "needle_roughness",
       "albedo": "needle_albedo"
     },
-    "materials": 9
+    "materials": 10
   },
   "stats": {},
   "counts": {
     "meshes": 16,
-    "vertices": 17126,
-    "triangles": 5724
+    "vertices": 4470,
+    "triangles": 1500
   }
 }

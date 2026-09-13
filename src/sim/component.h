@@ -88,4 +88,19 @@ ShipSpec derive_spec(const ShipDesign &design);
 /** A stock hull as a component set. `derived_*` over this must reproduce the SHIPS row. */
 const ShipDesign &stock_design(ShipClass shipClass);
 
+// ------------------------------------------------------- plan 05 s6.2's mount-time acceptance
+
+/** True when the design carries at least one drive: a design without one is flagged, never
+ *  silently allowed to fly (s6.2). */
+bool design_has_drive(const ShipDesign &design);
+
+/**
+ * Mounts a component into a design, rejecting overlaps: two parts closer than the 4 m flange
+ * pitch cannot share a hull. Returns false without mounting when the mount would overlap.
+ */
+bool mount_component(ShipDesign &design, const Component &component);
+
+/** Thrust-to-weight at `body`, for the refit's warning: a number, not a rule. */
+Real design_twr(const ShipDesign &design, const struct Body &body);
+
 }  // namespace opra

@@ -300,6 +300,49 @@ MeshData nebula_disc(int segments) {
     return mesh;
 }
 
+MeshData glow_disc(int segments) {
+    // A soft additive light: vertex colour falls from one at the centre to zero at the rim across
+    // three rings, so over a near-black field an additive draw of this mesh has no locatable edge
+    // at all - plan 05 S-1, the property the single big nebula billboard lost. Half extent 0.5, so
+    // an instance scale is the mote's full width.
+    MeshData mesh;
+    const glm::vec3 normal(0.0f, 0.0f, 1.0f);
+    mesh.vertices.push_back({{0.0f, 0.0f, 0.0f}, normal, glm::vec3(1.0f)});
+    const float ring_radius[3] = {0.18f, 0.46f, 1.0f};
+    const float ring_tone[3] = {0.86f, 0.38f, 0.0f};
+    uint32_t previous = 0;
+    for (int ring = 0; ring < 3; ++ring) {
+        const uint32_t first = static_cast<uint32_t>(mesh.vertices.size());
+        for (int i = 0; i <= segments; ++i) {
+            const float angle = 2.0f * PI * static_cast<float>(i) / static_cast<float>(segments);
+            mesh.vertices.push_back({{std::cos(angle) * ring_radius[ring] * 0.5f,
+                                      std::sin(angle) * ring_radius[ring] * 0.5f, 0.0f},
+                                     normal, glm::vec3(ring_tone[ring])});
+        }
+        if (ring == 0) {
+            // The innermost ring fans from the centre vertex: chord triangles between consecutive
+            // ring points would tile only the boundary and leave the centre open - the donut the
+            // first export of this mesh wore.
+            for (int i = 0; i < segments; ++i) {
+                const uint32_t c = previous;
+                const uint32_t p0 = first + static_cast<uint32_t>(i);
+                const uint32_t p1 = first + static_cast<uint32_t>(i) + 1;
+                mesh.indices.insert(mesh.indices.end(), {c, p0, p1, c, p1, p0});
+            }
+        } else {
+            for (int i = 0; i < segments; ++i) {
+                const uint32_t a0 = previous + static_cast<uint32_t>(i);
+                const uint32_t a1 = previous + static_cast<uint32_t>(i) + 1;
+                const uint32_t b0 = first + static_cast<uint32_t>(i);
+                const uint32_t b1 = first + static_cast<uint32_t>(i) + 1;
+                mesh.indices.insert(mesh.indices.end(), {a0, b0, b1, a0, b1, a1});
+            }
+        }
+        previous = first;
+    }
+    return mesh;
+}
+
 }  // namespace meshes
 
 void generate_tangents(MeshData &mesh) {

@@ -41,6 +41,7 @@ set(OPRA_SHADERS
     "mesh_vs_flame:mesh.hlsl:vs_6_0:VSFlame"
     "mesh_ps:mesh.hlsl:ps_6_0:PSMain"
     "mesh_ps_ambient:mesh.hlsl:ps_6_0:PSAmbient"
+    "mesh_ps_flame:mesh.hlsl:ps_6_0:PSFlame"
     "ui_vs:ui.hlsl:vs_6_0:VSMain"
     "ui_ps:ui.hlsl:ps_6_0:PSMain"
     "shadow_vs:shadow.hlsl:vs_6_0:VSMain"
@@ -105,6 +106,8 @@ add_executable(Opra
     src/sim/system.cpp
     src/sim/system_tests.cpp
     src/sim/collision.cpp
+    src/sim/combat.cpp
+    src/sim/combat_tests.cpp
     src/sim/component.cpp
     src/sim/component_tests.cpp
     src/sim/physics.cpp
@@ -133,7 +136,6 @@ add_executable(Opra
     src/game/warp_tests.cpp
     src/ui/flow.cpp
     src/ui/flow_tests.cpp
-    src/ui/map.cpp
     src/ui/menus.cpp
     src/ui/table.cpp
     src/ui/title.cpp

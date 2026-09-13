@@ -64,6 +64,8 @@ struct Body {
     std::string id;
     std::string name;
     BodyClass kind = BodyClass::Planet;
+    /** Hex tint from the system file ("#ff9c5c"): the albedo a body without a map still shows. */
+    std::string tint;
     /** Index of the body it orbits, or -1 for the star. Parents always precede their children. */
     int parent = -1;
     /** Gravitational parameter, m^3/s^2. Zero for a station: it is a target, not a primary. */

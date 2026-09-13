@@ -10,6 +10,7 @@ namespace opra {
 namespace {
 
 constexpr double TWO_PI = 6.283185307179586;
+constexpr double PI = 3.14159265358979323846;
 /** Half a sample wide: consecutive steps of a pass are far closer than this, so they merge. */
 constexpr double SCAN_ARC = 1.0e-4;
 
@@ -67,6 +68,7 @@ void record_scan(World &world, int body, double altitude, double ground_speed, d
     if (altitude < SCAN_MIN_ALTITUDE || altitude > SCAN_MAX_ALTITUDE) return;
     if (ground_speed > SCAN_MAX_GROUND_SPEED) return;
     merge_arc(world.scanned[static_cast<size_t>(body)], theta - SCAN_ARC, theta + SCAN_ARC);
+    note_scan_theta(world, body, theta);
 }
 
 double surveyed_radians(const World &world, int body) {
@@ -109,6 +111,35 @@ bool deploy_satellite(World &world, int body, const std::string &contract) {
     satellite.box_e = elements.e;
     world.satellites.push_back(satellite);
     return true;
+}
+
+std::vector<World::Discovery> generate_discoveries(const SystemDef &system) {
+    std::vector<World::Discovery> out;
+    static const char *kinds[] = {"derelict", "anomaly", "depot"};
+    static const char *names[] = {"cold hulk", "mass anomaly", "cached depot"};
+    // One candidate for every body with ground, at a longitude hashed from the body's own seed:
+    // the same file always draws the same thing to find, and a second system is a second set.
+    for (size_t i = 1; i < system.bodies.size(); ++i) {
+        const Body &body = system.bodies[i];
+        if (!body.terrain.present) continue;
+        const unsigned int hash = body.terrain.seed * 2654435761u;
+        World::Discovery discovery;
+        discovery.kind = kinds[hash % 3];
+        discovery.name = std::string(names[hash % 3]) + " - " + body.name;
+        discovery.body = static_cast<int>(i);
+        discovery.theta = (static_cast<double>(hash >> 8) / 16777216.0) * TWO_PI;
+        out.push_back(std::move(discovery));
+    }
+    return out;
+}
+
+void note_scan_theta(World &world, int body, double theta) {
+    for (World::Discovery &discovery : world.discoveries) {
+        if (discovery.found || discovery.body != body) continue;
+        double delta = std::fabs(theta - discovery.theta);
+        if (delta > PI) delta = TWO_PI - delta;
+        if (delta <= SCAN_ARC * 2.0) discovery.found = true;
+    }
 }
 
 std::vector<std::string> update_satellites(World &world) {

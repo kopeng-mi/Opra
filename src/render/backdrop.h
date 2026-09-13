@@ -34,7 +34,7 @@ struct Backdrop {
     };
 
     std::vector<Sky> stars;   // ~1200 points
-    std::vector<Sky> nebula;  // 3..5 soft discs
+    std::vector<Sky> nebula;  // 4 clouds of ~42 soft glows each (S-1: no locatable edge)
     std::vector<Grit> dust;   // ~600 motes in a wide box
     std::vector<Grit> motes;  // ~300 motes in a box around the hull
     float dust_box = 900.0f;

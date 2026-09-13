@@ -62,8 +62,12 @@ void run_loop(App &app, bool debug, int frame_limit) {
             app.world.warp_step(advance);
             app.now += advance;
             accumulator = 0.0;
-            if (app.warp.update(thrusting, app.world.contact_recent(), app.world.soi_switched,
-                                app.world.air_density > 0.0)) {
+            // s2.7's new rule: any round or torpedo in flight is real time - a warp step would
+            // advance them past what their swept segments can be trusted over.
+            if (app.world.combat_active()) {
+                if (app.warp.drop_to_real_time(Warp::Drop::Zoom)) app.toast("Warp dropped to 1x - weapons live");
+            } else if (app.warp.update(thrusting, app.world.contact_recent(), app.world.soi_switched,
+                                       app.world.air_density > 0.0)) {
                 app.toast("Warp dropped to 1x");
             }
         } else {
@@ -79,8 +83,14 @@ void run_loop(App &app, bool debug, int frame_limit) {
             }
             const bool thrusting = flight.thrust != 0.0 || flight.turn != 0.0 ||
                                    flight.strafe != 0.0 || flight.brake;
-            app.warp.update(thrusting, app.world.contact_recent(), app.world.soi_switched,
-                            app.world.air_density > 0.0);
+            if (app.world.combat_active()) {
+                if (app.warp.drop_to_real_time(Warp::Drop::Zoom)) {
+                    app.toast("Warp dropped to 1x - weapons live");
+                }
+            } else {
+                app.warp.update(thrusting, app.world.contact_recent(), app.world.soi_switched,
+                                app.world.air_density > 0.0);
+            }
         }
 
         // Built from the state this frame will draw: stepping first keeps the ship centred.

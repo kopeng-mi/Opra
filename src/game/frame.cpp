@@ -12,7 +12,6 @@
 #include "gpu/gpu.h"
 #include "hud/hud.h"
 #include "render/renderer.h"
-#include "ui/map.h"
 #include "ui/menus.h"
 #include "ui/screens.h"
 
@@ -39,6 +38,21 @@ Obstacle *beam_target(World &world, const Vec2 &muzzle, const Vec2 &direction, R
 
 /** The docking overlay's inputs, copied out of the world for the HUD layer. */
 DockFrame dock_frame_for(const World &world);
+
+/**
+ * A body's on-screen pixel radius (s2.5): the honest size the LOD and the icon work read. The
+ * divide is guarded - the follow body sits at the camera origin, where d would be zero - and the
+ * caller decides what a body at the origin owes the screen instead.
+ */
+float body_pixel_radius(const Camera &camera, const World &world, int index, float height) {
+    const glm::dvec2 offset =
+        world.body_zone_position(index) - glm::dvec2(camera.origin.x, camera.origin.y);
+    const double d = std::max(glm::length(offset), 1.0e-9);
+    const double radius = world.system.bodies[static_cast<size_t>(index)].radius;
+    const double pixels =
+        radius / d * (static_cast<double>(height) * 0.5) / std::tan(CAMERA_FOV_Y * 0.5);
+    return static_cast<float>(pixels);
+}
 
 void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     // Under --debug, every key the game receives and every pause transition: the log a support
@@ -76,16 +90,27 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
                 static_cast<double>(ship.velocity.y), length(ship.velocity), heading(ship.angle),
                 ship.angularVelocity * 57.29577951308232, static_cast<double>(ship.thrustLevel),
                 static_cast<double>(ship.hull), static_cast<double>(ship.fuel),
-                static_cast<double>(app.zoom_current), app.warp.rate(), ship.assist ? 1 : 0,
+                static_cast<double>(app.half_height_current), app.warp.rate(), ship.assist ? 1 : 0,
                 app.screen != ui::Screen::Flight ? 1 : 0);
     }
     // F1: the follow. It steps with the wall-clock dt, not the sim's fixed step, so the framing is
     // frame-rate independent; a step bigger than the snap distance (a warp jump, a reset) is
     // handled inside. It runs whether or not the flight camera is the one on screen, because the
-    // map and the plate would otherwise hand back a camera that had to catch up.
+    // plate would otherwise hand back a camera that had to catch up. The target is the ship unless
+    // a double-click put the follow on a body (s2.1); a docked ship inherits the station's motion,
+    // and the follow never jumps on undock because it was tracking the ship all along (s2.8).
     const glm::dvec2 ship_at(app.world.ship.position.x, app.world.ship.position.y);
     const glm::dvec2 ship_vel(app.world.ship.velocity.x, app.world.ship.velocity.y);
-    follow_step(app.follow, ship_at, ship_vel, dt, FollowParams{});
+    if (app.follow_body >= 0 &&
+        app.follow_body < static_cast<int>(app.world.bodies.size())) {
+        // The follow goal is the body's ZONE-frame state: the camera's origin lives in the zone
+        // frame with the ship, and a barycentric goal would put the view a quadrant away.
+        const int index = app.follow_body;
+        follow_step(app.follow, app.world.body_zone_position(index),
+                    app.world.body_zone_velocity(index), dt, FollowParams{});
+    } else {
+        follow_step(app.follow, ship_at, ship_vel, dt, FollowParams{});
+    }
 
     Input &input = app.input;
     World &world = app.world;
@@ -135,7 +160,7 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     // HUD, the cutter and the camera keys all stand down.
     if (app.screen == ui::Screen::Startup) {
         app.title_reveal = std::min(1.0f, app.title_reveal + static_cast<float>(dt) * 0.85f);
-        app.map_frame = orrery_frame_for(app.world, app.true_scale, app.map_target);
+        app.map_frame = orrery_frame_for(app.world, app.map_target);
         app.pointer.at = input.pointer;
         app.pointer.valid = input.pointer_valid;
         app.pointer.down = input.left;
@@ -169,18 +194,49 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         app.settings_dirty = false;
     }
 
-    // Camera scale: the wheel and the zoom keys, smoothed toward the target. SDL reports a wheel
-    // scrolled away from the user as positive, and that is the zoom-in direction.
+    // Camera scale (plan 05 s2.1): the wheel and the zoom keys multiply the half-height, so a
+    // notch feels the same at every scale - ten orders of magnitude on one control. Shift makes a
+    // notch a whole decade. SDL reports a wheel scrolled away from the user as positive, and that
+    // is the zoom-in direction.
+    const double notch = input.held(SDL_SCANCODE_LSHIFT) || input.held(SDL_SCANCODE_RSHIFT)
+                             ? ZOOM_NOTCH_FAST
+                             : ZOOM_NOTCH;
     if (input.wheel != 0.0f) {
-        app.zoom = std::clamp(app.zoom + input.wheel * ZOOM_STEP, ZOOM_MIN, ZOOM_MAX);
+        app.half_height = clamp_half_height(
+            app.half_height * std::exp(-static_cast<double>(input.wheel) * notch));
     }
     if (held(input, Action::ZoomIn)) {
-        app.zoom = std::clamp(app.zoom + ZOOM_STEP, ZOOM_MIN, ZOOM_MAX);
+        app.half_height = clamp_half_height(app.half_height * std::exp(-notch));
     }
     if (held(input, Action::ZoomOut)) {
-        app.zoom = std::clamp(app.zoom - ZOOM_STEP, ZOOM_MIN, ZOOM_MAX);
+        app.half_height = clamp_half_height(app.half_height * std::exp(notch));
     }
-    if (pressed(input, Action::ZoomReset)) app.zoom = app.settings.zoom_default;
+    // Home (s2.1): the flight framing and the ship, wherever the wheel had got to.
+    if (pressed(input, Action::ZoomReset)) {
+        app.half_height = HOME_HALF;
+        app.follow_body = -1;
+        app.camera_look = glm::dvec2(0.0);
+    }
+    // Scale presets (s2.1): 1..5 jump to hull / flight / local / orbital / system.
+    for (int preset = 0; preset < 5; ++preset) {
+        if (input.pressed(static_cast<SDL_Scancode>(SDL_SCANCODE_1 + preset))) {
+            app.half_height = SCALE_PRESETS[preset];
+            app.system_recall_half = 0.0;
+        }
+    }
+    // The system as the map was (J2): M jumps to system scale and back. The map screen itself is
+    // gone - this is the same view, the same world, seen ten decades wider.
+    if (pressed(input, Action::Map)) {
+        if (app.system_recall_half > 0.0) {
+            app.half_height = app.system_recall_half;
+            app.system_recall_half = 0.0;
+        } else {
+            app.system_recall_half = app.half_height;
+            app.half_height = SCALE_PRESETS[4];
+            app.follow_body = -1;
+        }
+        app.toast(app.system_recall_half > 0.0 ? "System scale" : "Flight scale");
+    }
     // Time warp: the rail is data (game/warp.*), so the keys, the manual and the HUD cannot drift
     // apart. Raising it is a request, not a promise: any burn or contact drops it straight back.
     if (pressed(input, Action::WarpUp)) app.warp.request(1);
@@ -215,37 +271,40 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         choice.manual = true;
         app.toast(minimap_mode_name(choice.mode));
     }
-    // The hand on the camera (A4): Ctrl and the mouse, a grab of the plane itself. On press the
-    // world point under the cursor is unprojected and held; while held, the same unprojection of
-    // the moving cursor is what the pan is stepped by, so the grabbed ground stays under the
-    // cursor at any pitch and any zoom - the projection does the work, not a pixels-to-metres
-    // scale that is only true on one screen row. Pitch is not touched: F1 reads it from settings
-    // once, at camera construction, and nothing in flight writes it.
+    // The camera's freedom (J1): Ctrl and the mouse swing the eye inside a 30-degree cone about
+    // the home axis. On press the cursor position is held; while held, the drag from that anchor
+    // is the cone angle, clamped; release and the angle walks back home, so a look is never a new
+    // home. The follow point does not move during a look - at system zoom an unbounded pan would
+    // lose the ship, which is why the plan-04 plane grab is gone.
     const bool looking = input.pointer_valid &&
                          (input.held(SDL_SCANCODE_LCTRL) || input.held(SDL_SCANCODE_RCTRL));
     if (looking) {
         if (!app.look_anchor.has_value()) {
-            app.look_anchor = unproject(app.camera, input.pointer.x, input.pointer.y,
-                                        static_cast<float>(width), static_cast<float>(height));
+            app.look_anchor = input.pointer;
         } else {
-            // Every frame, not only when the cursor moves: the follow moves the camera underneath
-            // a still hand, and the grab has to hold against that too.
-            const glm::dvec2 cursor =
-                unproject(app.camera, input.pointer.x, input.pointer.y, static_cast<float>(width),
-                          static_cast<float>(height));
-            look_step(app.camera_pan, *app.look_anchor, cursor);
+            look_cone_step(app.camera_look, app.look_anchor->x, app.look_anchor->y, input.pointer.x,
+                           input.pointer.y, static_cast<double>(height));
         }
     } else {
         app.look_anchor.reset();
-        // A look is a look: let go and the frame eases back to where the follow put it.
-        app.camera_pan = pan_release(app.camera_pan, dt, config::LOOK_RELEASE_TAU);
+        // A look is a look: let go and the eye eases back to the home axis.
+        app.camera_look = look_cone_release(app.camera_look, dt, config::LOOK_RELEASE_TAU);
     }
 
     if (app.settings.reduced_motion) {
-        app.zoom_current = app.zoom;  // no camera animation
+        app.half_height_current = app.half_height;  // no camera animation
     } else {
-        const float rate = 1.0f - std::exp(-static_cast<float>(dt) * 6.0f);
-        app.zoom_current += (app.zoom - app.zoom_current) * rate;
+        // Log-space easing: multiplicative in feel, so one notch is one notch at hull or system.
+        const double rate = 1.0 - std::exp(-static_cast<float>(dt) * ZOOM_SMOOTHING);
+        const double from = std::log(app.half_height_current);
+        const double to = std::log(app.half_height);
+        app.half_height_current = std::exp(from + (to - from) * rate);
+    }
+
+    // s2.7's hard rule, from the zoom side: below a 200 m half-height close quarters is real time.
+    if (app.half_height_current < ZOOM_REAL_TIME_BELOW &&
+        app.warp.drop_to_real_time(Warp::Drop::Zoom)) {
+        app.toast("Warp dropped to 1x - close quarters");
     }
 
     auto overworld = [&](const glm::vec2 &screen) {
@@ -274,27 +333,23 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         app.screen = ui::advance(app.screen, Action::ModelViewer);
         if (app.screen == ui::Screen::Viewer) app.toast("Model viewer");
     }
-    // The system map: the orrery and the ephemeris, over the flight view rather than beside it.
-    if (pressed(input, Action::Map)) {
-        app.screen = ui::advance(app.screen, Action::Map);
-        app.toast(app.screen == ui::Screen::Map ? "System map" : "Flight view");
+    // Close quarters (plan 05 s5): the PDCs' release, then a torpedo at whatever is tracked.
+    if (pressed(input, Action::WeaponsFree)) {
+        app.world.weapons_free = !app.world.weapons_free;
+        app.toast(app.world.weapons_free ? "Weapons free" : "Weapons hold");
     }
-    // The map's own keys, read while it is up: they do not change the screen, so they are not
-    // edges in FLOW.
-    if (app.screen == ui::Screen::Map) {
-        if (pressed(input, Action::TrueScale)) app.true_scale = !app.true_scale;
-        if (pressed(input, Action::PlanNode)) app.plan_transfer();
-        if (pressed(input, Action::WarpToNode)) {
-            if (app.world.warp_to_next_node()) app.toast("Burn complete");
+    if (pressed(input, Action::FireTorpedo)) {
+        if (app.world.fire_torpedo()) {
+            app.toast("Torpedo away");
+        } else {
+            app.toast("No torpedo - nothing tracked, or docked");
         }
-        // On the map, Tab walks the system's bodies rather than the sector's contacts: the star is
-        // skipped, because there is no transfer to a primary the ship is already orbiting.
-        if (pressed(input, Action::CycleContact)) {
-            const int count = static_cast<int>(app.system.bodies.size());
-            app.map_target = app.map_target < 1 ? 1 : app.map_target + 1;
-            if (app.map_target >= count) app.map_target = count > 1 ? 1 : -1;
-        }
-        app.map_frame = orrery_frame_for(app.world, app.true_scale, app.map_target);
+    }
+    // The planner, live in the flight view (J2 replaced the map screen): N inserts the selected
+    // body's transfer burns, B advances to the first of them exactly.
+    if (pressed(input, Action::PlanNode)) app.plan_transfer();
+    if (pressed(input, Action::WarpToNode)) {
+        if (app.world.warp_to_next_node()) app.toast("Burn complete");
     }
     if (app.screen != ui::Screen::Flight) return;
 
@@ -344,6 +399,45 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         } else if (!app.guns_warned) {
             app.guns_warned = true;
             app.toast("No guns fitted - the cutter is on C or the right button");
+        }
+
+        // Frame a body (s2.1): the second click of a double-click puts the follow on the body
+        // under the cursor and sizes the view to two and a half of its radii. The same gesture
+        // works at every scale, which is what makes one continuous zoom navigable.
+        const double click_seconds = static_cast<double>(ticks) / 1000.0;
+        const bool double_click =
+            (click_seconds - app.last_click_at) < 0.35 &&
+            glm::length(input.pointer - app.last_click_at_px) < 14.0f;
+        app.last_click_at = click_seconds;
+        app.last_click_at_px = input.pointer;
+        if (double_click) {
+            const float w = static_cast<float>(width), h = static_cast<float>(height);
+            const glm::mat4 click_matrix = view_projection(app.camera);
+            int body = -1;
+            float best_body = 28.0f;
+            for (size_t i = 0; i < world.bodies.size(); ++i) {
+                const glm::dvec2 at_zone = world.body_zone_position(static_cast<int>(i));
+                const glm::vec2 at = project(click_matrix, app.camera.origin, at_zone.x, at_zone.y,
+                                             0.0f, w, h);
+                const bool clipped = at.x < 0.0f || at.y < 0.0f || at.x > w || at.y > h;
+                if (clipped || !std::isfinite(at.x) || !std::isfinite(at.y)) continue;
+                const float hit =
+                    std::max(14.0f, 2.5f * body_pixel_radius(app.camera, world,
+                                                             static_cast<int>(i), h));
+                const float distance = glm::length(at - input.pointer);
+                if (distance < std::min(best_body, hit)) {
+                    best_body = distance;
+                    body = static_cast<int>(i);
+                }
+            }
+            if (body >= 0) {
+                app.follow_body = body;
+                app.map_target = body;
+                app.system_recall_half = 0.0;
+                app.half_height =
+                    clamp_half_height(2.5 * static_cast<double>(world.system.bodies[static_cast<size_t>(body)].radius));
+                app.toast("Frame: " + world.system.bodies[static_cast<size_t>(body)].name);
+            }
         }
     }
 
@@ -431,26 +525,22 @@ void render_app(App &app, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *color,
 
     app.scene.clear();
     UIBatch ui;
-    if (app.screen == ui::Screen::Startup || app.screen == ui::Screen::Map) {
-        // The orrery, then either the title plate or the almanac beside it: one scene builder, one
-        // camera, one draw frame (E12, plan 4.4).
+    if (app.screen == ui::Screen::Startup) {
+        // The orrery turns behind the title plate: the one screen the flight camera does not own
+        // (E12). The map screen it shared a camera with is one continuous zoom now (plan 05 J2).
         orrery::build(app.scene, app.orrery_meshes, app.map_frame);
         const ui::Rect screen{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
         app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer,
                      app.nav);
-        if (app.screen == ui::Screen::Startup) {
-            ui::TitleFrame title;
-            title.sessionSeconds = app.world.elapsed;
-            title.docked = app.world.docked;
-            title.dockName = "Wayfarer";
-            title.shipName = app.world.ship.spec ? app.world.ship.spec->name : "";
-            title.reveal = app.title_reveal;
-            const ui::TitleAction action =
-                ui::build_title(app.ui, screen, title, app.title_selected);
-            if (action != ui::TitleAction::None) app.title_action = action;
-        } else {
-            ui::build_map(app.ui, ui::map_layout(screen.w, screen.h), app.map_frame);
-        }
+        ui::TitleFrame title;
+        title.sessionSeconds = app.world.elapsed;
+        title.docked = app.world.docked;
+        title.dockName = "Wayfarer";
+        title.shipName = app.world.ship.spec ? app.world.ship.spec->name : "";
+        title.reveal = app.title_reveal;
+        const ui::TitleAction action =
+            ui::build_title(app.ui, screen, title, app.title_selected);
+        if (action != ui::TitleAction::None) app.title_action = action;
         app.ui.end();
         draw_frame(renderer, app.text, cmd, color, format, width, height, app.camera, app.scene, ui);
         return;
@@ -468,7 +558,7 @@ void render_app(App &app, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *color,
     // The scene builds with the camera's own render origin: the backdrop, the field and the ship
     // are all placed relative to it, inside a margin for the biggest rock.
     build_scene(app.scene, app.models, app.world, app.backdrop, app.camera, static_cast<float>(width),
-                static_cast<float>(height));
+                static_cast<float>(height), app.lod_memory);
 
     HudFrame frame = make_hud_frame(app, width, height);
     app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer, app.nav);
@@ -513,6 +603,12 @@ void render_app(App &app, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *color,
     const float w = static_cast<float>(width);
     const float h = static_cast<float>(height);
     const glm::mat4 matrix = view_projection(app.camera);
+    // The zoom overlay (s2.4, s2.6): orbit lines, predicted legs, node marks and icons, drawn into
+    // the UI batch so they land after tonemap with the depth test always off. Flight only: the
+    // chart and the manual own the whole glass when they are up.
+    if (app.screen == ui::Screen::Flight) {
+        build_zoom_overlay(ui, app.world, app.camera, w, h);
+    }
     if (app.beam_active) {
         const glm::vec2 from =
             project(matrix, app.camera.origin, app.beam_from.x, app.beam_from.y, 0.0f, w, h);

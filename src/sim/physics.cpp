@@ -11,15 +11,18 @@
 namespace opra {
 
 const ShipSpec SHIPS[3] = {
-    {"Kestrel", "Independent corvette", 82000, 1600000, 16000, 1.35, 100, 42, 120, 0.055, 1, 1},
-    {"Mule", "Heavy salvage tug", 142000, 1950000, 30000, 0.82, 150, 58, 320, 0.075, 1, 1},
-    {"Needle", "Fast reconnaissance cutter", 43000, 1200000, 10000, 2.05, 75, 31, 40, 0.05, 1, 1},
+    {"Kestrel", "Independent corvette", 82000, 1600000, 16000, 1.35, 100, 42, 120, 0.055, 1, 1,
+     0.22},
+    {"Mule", "Heavy salvage tug", 142000, 1950000, 30000, 0.82, 150, 58, 320, 0.075, 1, 1, 0.22},
+    {"Needle", "Fast reconnaissance cutter", 43000, 1200000, 10000, 2.05, 75, 31, 40, 0.05, 1, 1,
+     0.22},
 };
 
-// The stock boxes, re-authored with the hulls (plan-04 H6): the Kestrel and the Mule are 46 m
-// and 58 m hulls now, and the box is the lit (flames-included) geometry, so the handling and the
-// drawn ship never disagree. The Needle keeps its own until its reference lands (plan-04 H4).
-const HullBoxes HULL_BOXES[3] = {{32.1, 11.8}, {38.8, 13.9}, {62, 27}};
+// The stock boxes, re-measured against the plan-05 re-authored hulls: the box is the lit
+// (flames-included) geometry, so the handling and the drawn ship never disagree. The Kestrel's
+// width is the s3 hull's own 14.8 m plus the identity bands - the plan-04 model ran 60% over its
+// own spec width, which is one of the things the s3 audit now catches.
+const HullBoxes HULL_BOXES[3] = {{32.1, 8.1}, {38.8, 13.9}, {62, 22.7}};
 
 namespace {
 
@@ -101,7 +104,10 @@ void step_ship(ShipState &state, const FlightInput &input, Real dt, const Vec2 &
     state.contactTimer += dt;
     const ShipSpec &spec = *state.spec;
     const Real dryMass = spec.mass;
-    const Real maxAcceleration = spec.thrust / (dryMass + state.fuel);
+    // s5.4: a drive-pod hit degrades thrust - the authority the whole flight model runs on is
+    // (1 - damage), and a venting tank drains until it is dry or patched at a base.
+    const Real maxAcceleration =
+        spec.thrust * (1.0 - clampr(state.thrustDamage, 0.0, 1.0)) / (dryMass + state.fuel);
     const bool canBurn = state.fuel > 0 && state.hull > 0;
     const Real boost = (input.boost && state.heat < 0.95) ? 1.65 : 1.0;
     const Real thrust = canBurn ? clampr(input.thrust, -0.28, 1.0) * boost : 0.0;
@@ -109,8 +115,13 @@ void step_ship(ShipState &state, const FlightInput &input, Real dt, const Vec2 &
     const Real strafe = canBurn ? clampr(input.strafe, -1.0, 1.0) : 0.0;
     const Vec2 forward{-std::sin(state.angle), std::cos(state.angle)};
     const Vec2 right{std::cos(state.angle), std::sin(state.angle)};
-    Real ax = forward.x * thrust * maxAcceleration + right.x * strafe * maxAcceleration * 0.22;
-    Real ay = forward.y * thrust * maxAcceleration + right.y * strafe * maxAcceleration * 0.22;
+    // s5.1: translation authority is the hull's own derived fraction, not a global constant - a
+    // refit with more RCS blocks manoeuvres better.
+    const Real strafe_fraction = spec.strafeFraction;
+    Real ax = forward.x * thrust * maxAcceleration +
+              right.x * strafe * maxAcceleration * strafe_fraction;
+    Real ay = forward.y * thrust * maxAcceleration +
+              right.y * strafe * maxAcceleration * strafe_fraction;
     // Gravity is a frame term, not a control input: it is added here and read nowhere else, so the
     // rest of the model - mass ratio, torque, heat, assist - is untouched by the star system.
     ax += gravity.x;
@@ -143,7 +154,7 @@ void step_ship(ShipState &state, const FlightInput &input, Real dt, const Vec2 &
     state.velocity.y += ay * dt;
     state.position.x += state.velocity.x * dt;
     state.position.y += state.velocity.y * dt;
-    state.fuel = std::max(0.0, state.fuel - fuelRate * dt);
+    state.fuel = std::max(0.0, state.fuel - (fuelRate + state.fuelLeak) * dt);
     state.acceleration = std::hypot(ax, ay);
     state.thrustLevel = thrust;
     const Real speed = length(state.velocity);
@@ -225,11 +236,13 @@ std::deque<Obstacle> create_obstacles() {
     keeps.push_back({RELAY.x, RELAY.y, 175});
 
     int id = 0;
-    // R-2: 320 draws, not 460, and a cubic roll on the radius. A quadratic tail put an 86 m rock in
-    // a field where the ship is 80 m long - 307 px of a 900 px frame - and under perspective the
-    // near ones loomed, so the field read as rubble rather than as a field. A cubic tail keeps the
-    // few big ones rare and the many small ones common, which is the distribution a real belt has.
-    for (int i = 0; i < 320; ++i) {
+    // R-2: a cubic roll on the radius. A quadratic tail put an 86 m rock in a field where the ship
+    // is 80 m long - 307 px of a 900 px frame - and under perspective the near ones loomed, so the
+    // field read as rubble rather than as a field. A cubic tail keeps the few big ones rare and
+    // the many small ones common, which is the distribution a real belt has.
+    // Plan 05 s3.1: the home framing doubled, so every rock draws twice the size it did and the
+    // same count would read as rubble again. 192 keeps the flight view a field, not a wall.
+    for (int i = 0; i < 192; ++i) {
         const Real x = (rng.next() - 0.5) * 5200;
         const Real y = (rng.next() - 0.5) * 4200;
         const Real roll = rng.next();
@@ -250,8 +263,11 @@ std::deque<Obstacle> create_obstacles() {
         rock.y = y;
         rock.radius = radius;
         rock.seed = i + 12;
-        // The background shelf: every fifth rock sits below the navigation plane and never collides.
-        rock.z = (i % 5 == 0) ? -120 - rng.next() * 210 : 0;
+        // The background shelf: every fifth rock sits well below the navigation plane and never
+        // collides. Far enough down that perspective shrinks it to a silhouette - at -200 m a rock
+        // filled the frame with a dark disc and a lit crescent, reading as a planet nobody put
+        // there (plan 05 S-1's own standard: nothing at close range may read as a circle).
+        rock.z = (i % 10 == 0) ? -2500.0 - rng.next() * 2500.0 : 0;
         rock.hp = hp;
         rock.maxHp = hp;
         rocks.push_back(rock);
@@ -346,6 +362,9 @@ Real apply_contact(ShipState &state, Real restitution, const Vec2 &push) {
     state.position.y += push.y;
     const Real closing = state.velocity.x * nx + state.velocity.y * ny;
     if (closing >= 0) return 0;
+    // s5.1: at close quarters a nudge against a rock is a nudge. Restitution fades out below 5
+    // m/s of closing speed, so low-speed contact cannot launch the hull.
+    restitution *= std::clamp(-closing / 5.0, 0.0, 1.0);
     state.velocity.x -= restitution * closing * nx;
     state.velocity.y -= restitution * closing * ny;
     // Damage starts at 6 m/s and climbs slower than the closing speed, and a fresh impact costs hull

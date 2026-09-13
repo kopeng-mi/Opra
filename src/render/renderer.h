@@ -118,6 +118,8 @@ struct SkyDraw {
     int mesh = -1;
     bool shell = false;
     bool star = false;
+    /** The re-projected shell set (plan 05 s2.3): drawn after the near pass's backdrop. */
+    bool deep = false;
     /** The bound maps for this draw, matching the shader's t0..t2; null samples the white texel. */
     SDL_GPUTexture *maps[3] = {nullptr, nullptr, nullptr};
     bool tile = false;  // the star's photosphere samples a tile sampler; planets, equirectangular

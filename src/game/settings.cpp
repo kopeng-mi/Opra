@@ -44,7 +44,6 @@ void Settings::load() {
         if (split == std::string::npos) continue;
         const std::string key = line.substr(0, split);
         const std::string value = line.substr(split + 1);
-        if (key == "zoom_default") zoom_default = static_cast<float>(std::atof(value.c_str()));
         if (key == "camera_pitch") {
             const float parsed = static_cast<float>(std::atof(value.c_str()));
             // A value outside the slider's own range came from a hand-edited file or an older
@@ -56,7 +55,6 @@ void Settings::load() {
         if (key == "msaa") msaa = std::atoi(value.c_str()) >= 4 ? 4 : 1;
         if (key == "show_stats") show_stats = parse_bool(value, show_stats);
     }
-    zoom_default = std::max(0.6f, std::min(3.0f, zoom_default));
 }
 
 bool Settings::save() const {
@@ -67,7 +65,6 @@ bool Settings::save() const {
     std::ofstream file(path, std::ios::trunc);
     if (!file) return false;
     file << "# opra settings\n";
-    file << "zoom_default=" << zoom_default << "\n";
     file << "camera_pitch=" << camera_pitch << "\n";
     file << "assist=" << (assist ? 1 : 0) << "\n";
     file << "reduced_motion=" << (reduced_motion ? 1 : 0) << "\n";

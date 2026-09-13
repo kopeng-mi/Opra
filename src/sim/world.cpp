@@ -44,6 +44,8 @@ void World::attach_system(const SystemDef &loaded, int anchor_index) {
     surfaces.clear();
     surfaces.reserve(system.bodies.size());
     scanned.assign(system.bodies.size(), {});
+    // The survey's finds (plan 05 s6.1), described by the system's own seeds.
+    discoveries = generate_discoveries(system);
     for (const Body &body : system.bodies) surfaces.push_back(generate_surface(body));
 }
 
@@ -225,6 +227,8 @@ void World::step(const FlightInput &input, Real dt) {
     stationSpin += dt * STATION_SPIN_RATE;
     set_station_spin(stationSpin);
     run_nodes();
+    // Close quarters runs inside the fixed step: rounds, torpedoes and their hits are sim state.
+    step_combat(dt);
     for (Obstacle &fragment : fragments) {
         if (fragment.retired) continue;
         step_fragment(fragment, grid, dt);
@@ -397,6 +401,203 @@ bool World::warp_to_next_node() {
     // it: this is the one place where "warp" and "the burn happens correctly" are the same feature.
     warp_step(span);
     run_nodes();
+    return true;
+}
+
+// ---------------------------------------------------------------- close quarters (plan 05 s5)
+
+namespace {
+
+/** PDC ballistics, from the plan's own figures (s5.2, s5.4): a 20 g round at 1100 m/s. */
+constexpr Real PDC_ROUND_MASS = 0.02;
+constexpr Real PDC_ROUND_SPEED = 1100.0;
+constexpr Real PDC_RANGE = 800.0;
+constexpr Real PDC_COOLDOWN = 0.10;      // seconds between rounds from one mount
+constexpr Real PDC_ENGAGE_RANGE = 700.0;  // the release the mount opens fire inside
+
+/**
+ * The compound shape a swept segment struck first, or -1. The round's whole segment is tested
+ * against each shape - a circle by the segment-circle hit, a box by stepping the point test along
+ * the segment - and the earliest strike wins, because that is the shape the damage lands on (s5.4).
+ */
+int swept_ship_shape(const Collider &collider, const Vec2 &ship_position, Real ship_angle,
+                     const Vec2 &from, const Vec2 &to) {
+    const Real c = std::cos(ship_angle), sn = std::sin(ship_angle);
+    int best = -1;
+    Real best_t = 2.0;
+    for (int i = 0; i < static_cast<int>(collider.shapes.size()); ++i) {
+        const Shape &shape = collider.shapes[static_cast<size_t>(i)];
+        const Real wx = ship_position.x + shape.local_pos.x * c - shape.local_pos.y * sn;
+        const Real wy = ship_position.y + shape.local_pos.x * sn + shape.local_pos.y * c;
+        if (shape.kind == Shape::Kind::Circle) {
+            Real t = 2.0;
+            if (segment_circle_hit(from.x, from.y, to.x, to.y, Circle{wx, wy, 0.0}, shape.radius,
+                                   t) &&
+                t < best_t) {
+                best_t = t;
+                best = i;
+            }
+            continue;
+        }
+        const Box box{wx, wy, shape.half_length, shape.half_width, shape.local_angle + ship_angle};
+        for (int k = 0; k <= 6; ++k) {
+            const Real f = static_cast<Real>(k) / 6.0;
+            if (point_in_box(box, from.x + (to.x - from.x) * f, from.y + (to.y - from.y) * f)) {
+                if (f < best_t) {
+                    best_t = f;
+                    best = i;
+                }
+                break;
+            }
+        }
+    }
+    return best;
+}
+
+}  // namespace
+
+void World::step_combat(Real dt) {
+    // PDC engagement: every mount picks its intercept on the tracked contact, with the plan's own
+    // degenerate handling - no solution, beyond range, own-hull occluded - and the mount holds
+    // fire instead of firing uselessly (s5.2). Firing while docked is blocked (s5.5).
+    static std::vector<Real> cooldowns;
+    const int mounts = static_cast<int>(std::min<size_t>(pdc_mounts.size(), 8));
+    cooldowns.resize(static_cast<size_t>(mounts), 0.0);
+    std::vector<Contact> list = contacts();
+    const int tracked = contact_index(list, target);
+    if (weapons_free && tracked >= 0 && docked_for < 0.0 && capture_started < 0.0) {
+        const Contact &contact = list[static_cast<size_t>(tracked)];
+        for (int m = 0; m < mounts; ++m) {
+            cooldowns[static_cast<size_t>(m)] = std::max(0.0, cooldowns[static_cast<size_t>(m)] - dt);
+            if (cooldowns[static_cast<size_t>(m)] > 0.0) continue;
+            const Real c = std::cos(ship.angle), sn = std::sin(ship.angle);
+            const Vec2 mount{ship.position.x + pdc_mounts[static_cast<size_t>(m)].x * c -
+                                 pdc_mounts[static_cast<size_t>(m)].y * sn,
+                             ship.position.y + pdc_mounts[static_cast<size_t>(m)].x * sn +
+                                 pdc_mounts[static_cast<size_t>(m)].y * c};
+            const Real dx = contact.position.x - mount.x;
+            const Real dy = contact.position.y - mount.y;
+            if (std::hypot(dx, dy) > PDC_ENGAGE_RANGE) continue;
+            // The tracked marks are static in the zone frame, so the intercept is a direct aim.
+            const Vec2 relative{dx, dy};
+            const Vec2 target_velocity{0.0, 0.0};
+            const Real t = lead_solve(relative, target_velocity, PDC_ROUND_SPEED);
+            if (t < 0.0 || PDC_ROUND_SPEED * t > PDC_RANGE) continue;
+            const Real aim_len = std::hypot(dx + target_velocity.x * t, dy + target_velocity.y * t);
+            if (!(aim_len > 1e-9)) continue;
+            const Vec2 aim{(dx + target_velocity.x * t) / aim_len,
+                           (dy + target_velocity.y * t) / aim_len};
+            if (!aim_clears_own_hull(ship.collider, ship.position, ship.angle, mount, aim,
+                                     PDC_RANGE)) {
+                continue;  // a stern turret does not fire through its own ship (s5.2)
+            }
+            const Vec2 muzzle = clear_muzzle(ship.collider, ship.position, ship.angle, mount, aim,
+                                             ship.bounds.halfLength + 2.0);
+            Round round;
+            round.position = muzzle;
+            round.velocity = {aim.x * PDC_ROUND_SPEED, aim.y * PDC_ROUND_SPEED};
+            round.damage = kinetic_damage(PDC_ROUND_MASS, PDC_ROUND_SPEED);
+            round.owner = 0;
+            rounds.push_back(round);
+            cooldowns[static_cast<size_t>(m)] = PDC_COOLDOWN;
+        }
+    }
+
+    // Rounds: swept-segment hits against everything solid they pass over this step (s5.2) - a
+    // 1100 m/s round covers 9.2 m per 120 Hz step, so a per-step point test simply does not work.
+    std::vector<Obstacle *> near;
+    for (size_t i = rounds.size(); i-- > 0;) {
+        Round &round = rounds[i];
+        const Vec2 from{round.position.x, round.position.y};
+        if (!step_round(round, dt)) {
+            rounds.erase(rounds.begin() + static_cast<long>(i));
+            continue;
+        }
+        const Vec2 to{round.position.x, round.position.y};
+        grid.near_segment(from.x, from.y, to.x, to.y, near);
+        bool spent = false;
+        for (const Obstacle *body : near) {
+            if (body->retired || body->z != 0 || body->hp <= 0) continue;
+            Real t = 2.0;
+            if (segment_circle_hit(from.x, from.y, to.x, to.y, Circle{body->x, body->y, 0.0},
+                                   body->radius * 0.92, t)) {
+                // PDC vs rock: the same damage path the cutter drives (s5.5).
+                Obstacle &hit = *const_cast<Obstacle *>(body);
+                hit.hp -= round.damage;
+                if (hit.hp <= 0) break_rock(hit);
+                spent = true;
+                break;
+            }
+        }
+        // s5.4: a round that crosses the ship's own hull lands on the compound shape it struck -
+        // drive pod or tank, not a single pool. A mount's own fire spawns clear of the hull and is
+        // occlusion-tested before firing, so this path is everything else.
+        if (!spent) {
+            const int shape = swept_ship_shape(ship.collider, ship.position, ship.angle, from, to);
+            if (shape >= 0) {
+                apply_ship_damage(ship, shape, round.damage);
+                spent = true;
+            }
+        }
+        if (spent) rounds.erase(rounds.begin() + static_cast<long>(i));
+    }
+
+    // Torpedoes: guide while the tracked contact lives, then coast on the last heading (s5.5).
+    for (size_t i = torpedoes.size(); i-- > 0;) {
+        Torpedo &torpedo = torpedoes[i];
+        const Vec2 from{torpedo.position.x, torpedo.position.y};
+        Vec2 aim_at = from;
+        bool alive = false;
+        if (target >= 0) {
+            const int tracked_at = contact_index(list, target);
+            if (tracked_at >= 0) {
+                aim_at = list[static_cast<size_t>(tracked_at)].position;
+                alive = true;
+            }
+        }
+        step_torpedo(torpedo, aim_at, Vec2{0.0, 0.0}, alive, dt);
+        const Vec2 to{torpedo.position.x, torpedo.position.y};
+        bool detonated = alive && std::hypot(to.x - aim_at.x, to.y - aim_at.y) < 8.0;
+        grid.near_segment(from.x, from.y, to.x, to.y, near);
+        for (const Obstacle *body : near) {
+            if (body->retired || body->z != 0) continue;
+            Real t = 2.0;
+            if (segment_circle_hit(from.x, from.y, to.x, to.y, Circle{body->x, body->y, 0.0},
+                                   body->radius, t)) {
+                detonated = true;
+                break;
+            }
+        }
+        // The warhead on the ship's own hull: the compound shape it struck takes it (s5.4) - the
+        // kinetic term of a 450 kg torpedo at 320 m/s plus the fixed warhead.
+        const int ship_shape = swept_ship_shape(ship.collider, ship.position, ship.angle, from, to);
+        if (ship_shape >= 0) {
+            apply_ship_damage(ship, ship_shape, kinetic_damage(450.0, 320.0) + torpedo.warhead);
+            detonated = true;
+        }
+        if (detonated || torpedo.age > ROUND_LIFETIME) {
+            torpedoes.erase(torpedoes.begin() + static_cast<long>(i));
+        }
+    }
+}
+
+bool World::fire_torpedo() {
+    // Firing while docked is blocked (s5.5).
+    if (docked_for >= 0.0 || capture_started >= 0.0) return false;
+    std::vector<Contact> list = contacts();
+    if (contact_index(list, target) < 0) return false;
+    Torpedo torpedo;
+    // Spawn at the nose plus the hull radius along the heading (s5.5's spawn rule).
+    const Vec2 forward{-std::sin(ship.angle), std::cos(ship.angle)};
+    torpedo.position = {ship.position.x + forward.x * (ship.bounds.halfLength + 4.0),
+                        ship.position.y + forward.y * (ship.bounds.halfLength + 4.0)};
+    torpedo.velocity = {forward.x * 320.0 + ship.velocity.x,
+                        forward.y * 320.0 + ship.velocity.y};
+    torpedo.target = target;
+    torpedo.fuel = 12.0;
+    torpedo.warhead = 4.0e6;
+    torpedo.angle = ship.angle;
+    torpedoes.push_back(torpedo);
     return true;
 }
 

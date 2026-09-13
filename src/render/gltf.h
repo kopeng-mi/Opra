@@ -126,6 +126,14 @@ struct ModelSet {
     int sky_mesh = -1;
     /** The nebula wash: one soft disc, billboarded and tinted per instance. */
     int nebula_mesh = -1;
+    /** A soft additive glow with no locatable rim: the nebula's mote (plan 05 S-1). */
+    int glow_mesh = -1;
+    /**
+     * The body sphere: every sky body - chart glyph, deep pass, planet filling the frame - draws
+     * with this and the planet shader's own LOD (plan 4.4). The orrery registers the same key, so
+     * both paths share one mesh id.
+     */
+    int planet_mesh = -1;
     /** Every rock bucket by seed, resolved at build time so no mesh appears after upload. */
     int rock_mesh[13][8] = {};
 

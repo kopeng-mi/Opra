@@ -3,8 +3,11 @@
 // makes the derivation land on the SHIPS row.
 #include "sim/component.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string_view>
+
+#include "sim/system.h"
 
 namespace opra {
 namespace {
@@ -175,7 +178,40 @@ ShipSpec derive_spec(const ShipDesign &design) {
     spec.cooling = derived_cooling(design);
     spec.scanScale = 1;
     spec.collectScale = 1;
+    // s5.1 via s6.2: the lateral authority is derived from the RCS count, never authored. Four
+    // corner blocks - every stock hull's fit - is 22% of main thrust, the figure the flight model
+    // already tuned to.
+    int rcs = 0;
+    for (const Component &component : design.components) rcs += is_rcs(component) ? 1 : 0;
+    spec.strafeFraction = std::clamp(0.055 * rcs, 0.10, 0.45);
     return spec;
+}
+
+bool design_has_drive(const ShipDesign &design) {
+    for (const Component &component : design.components) {
+        if (is_drive(component) && component.thrust > 0) return true;
+    }
+    return false;
+}
+
+bool mount_component(ShipDesign &design, const Component &component) {
+    // s6.2: overlapping components are rejected at mount time. The flange is a 4 m pitch; two
+    // mounts closer than that cannot both be bolted to.
+    constexpr Real MIN_PITCH = 4.0;
+    for (const Component &placed : design.components) {
+        const Real dx = placed.mount.x - component.mount.x;
+        const Real dy = placed.mount.y - component.mount.y;
+        if (std::hypot(dx, dy) < MIN_PITCH) return false;
+    }
+    design.components.push_back(component);
+    return true;
+}
+
+Real design_twr(const ShipDesign &design, const struct Body &body) {
+    if (body.mu <= 0.0 || body.radius <= 0.0) return 0;
+    const Real weight = static_cast<Real>(derived_mass(design)) *
+                        static_cast<Real>(body.mu / (body.radius * body.radius));
+    return weight > 0.0 ? static_cast<Real>(derived_thrust(design)) / weight : 0;
 }
 
 // The collider and the ports deliberately do not appear above: P4 walks this same component list

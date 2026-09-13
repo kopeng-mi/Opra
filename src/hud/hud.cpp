@@ -85,6 +85,53 @@ std::string readout(float value, int decimals, const char *suffix) {
     return buffer;
 }
 
+/**
+ * s4.3: thousands grouped with thin spaces, so `1 204.8 km` never changes width as it counts. One
+ * implementation for every block; a readout that grows a digit is a readout that moves its
+ * neighbours.
+ */
+std::string grouped(double value, int decimals, const char *suffix = "") {
+    char raw[48];
+    std::snprintf(raw, sizeof raw, "%.*f", decimals, value);
+    std::string digits(raw);
+    const size_t dot = digits.find('.');
+    const size_t end = dot == std::string::npos ? digits.size() : dot;
+    std::string out;
+    for (size_t i = 0; i < end; ++i) {
+        const bool boundary = i > 0 && (end - i) % 3 == 0;
+        const bool negative = digits[0] == '-';
+        if (boundary && !(negative && i == 1)) out += "\xe2\x80\x89";  // U+2009 thin space
+        out += digits[i];
+    }
+    if (dot != std::string::npos) out += digits.substr(dot);
+    return out + suffix;
+}
+
+/** Seconds as s4.3 prints them: `31 d 22:14`, `4:12`, `0.8 s`. */
+std::string span_readout(double seconds) {
+    const bool negative = seconds < 0.0;
+    double magnitude = std::fabs(seconds);
+    char buffer[48];
+    if (magnitude >= 86400.0) {
+        const long long days = static_cast<long long>(magnitude / 86400.0);
+        const int hours = static_cast<int>(std::fmod(magnitude, 86400.0) / 3600.0);
+        const int minutes = static_cast<int>(std::fmod(magnitude, 3600.0) / 60.0);
+        std::snprintf(buffer, sizeof buffer, "%s%lld d %02d:%02d", negative ? "-" : "", days, hours,
+                      minutes);
+    } else if (magnitude >= 3600.0) {
+        const int hours = static_cast<int>(magnitude / 3600.0);
+        const int minutes = static_cast<int>(std::fmod(magnitude, 3600.0) / 60.0);
+        std::snprintf(buffer, sizeof buffer, "%s%d:%02d h", negative ? "-" : "", hours, minutes);
+    } else if (magnitude >= 60.0) {
+        const int minutes = static_cast<int>(magnitude / 60.0);
+        const int secs = static_cast<int>(std::fmod(magnitude, 60.0));
+        std::snprintf(buffer, sizeof buffer, "%s%d:%02d", negative ? "-" : "", minutes, secs);
+    } else {
+        std::snprintf(buffer, sizeof buffer, "%s%.1f s", negative ? "-" : "", magnitude);
+    }
+    return buffer;
+}
+
 std::string clock_string(float seconds) {
     const int total = static_cast<int>(std::max(0.0f, seconds));
     char buffer[32];
@@ -135,36 +182,34 @@ namespace {
 // The corner blocks. Each one draws inside the rect the layouter gave it: the block does not know
 // where it is on screen and does not care, which is what stops a cluster from placing itself at a
 // y value someone worked out by hand (R-1).
-void draw_mark(UIBatch &batch, const HudFrame &frame, const Rect &at) {
-    using ui::push_rect;
-    using ui::push_text;
-    using ui::with_alpha;
-    push_text(batch, "OPRA", 22.0f, {at.x, at.y}, TextAlign::Left, ETCH);
-    if (frame.contractId && *frame.contractId) {
-        push_text(batch, frame.contractId, 13.0f, {at.x, at.y + 40.0f}, TextAlign::Left, ETCH_DIM,
-                  TextFace::Label);
+/** The named header rule: title, then a hairline to the block's right edge, then an optional
+ *  right-aligned suffix. The device that lets density stay readable. */
+void block_header(UIBatch &batch, const Rect &at, const char *title, const char *suffix = nullptr) {
+    push_text(batch, title, 13.0f, {at.x, at.y}, TextAlign::Left, ETCH_DIM, TextFace::Label);
+    float title_w = 0.0f;
+    for (const char *c = title; *c; ++c) title_w += 13.0f * 0.58f;
+    const float rule_x = at.x + title_w + 8.0f;
+    const float rule_end = at.x + at.w - (suffix && *suffix ? 90.0f : 0.0f);
+    if (rule_end > rule_x) {
+        push_rect(batch, {rule_x, at.y + 9.0f}, {rule_end - rule_x, 1.0f},
+                  with_alpha(ETCH, 0.22f));
     }
-    if (frame.objective && *frame.objective) {
-        push_text(batch, frame.objective, 15.0f, {at.x + 62.0f, at.y + 38.0f}, TextAlign::Left,
-                  ETCH, TextFace::Label);
-    }
-    // The progress bar: dormant track, then the filled part over it.
-    push_rect(batch, {at.x, at.y + 66.0f}, {232.0f, 1.0f}, with_alpha(ETCH, 0.15f));
-    push_rect(batch, {at.x, at.y + 66.0f}, {232.0f * ui::clamp01(frame.progress), 1.0f}, NAV);
-}
-
-void draw_session(UIBatch &batch, const HudFrame &frame, const Rect &at) {
-    const float right = at.x + at.w;
-    // The status dot trails the clock, so the clock stops six pixels short of the inset edge.
-    push_text(batch, clock_string(frame.sessionSeconds).c_str(), 13.0f, {right - 6.0f, at.y},
-              TextAlign::Right, ETCH);
-    push_disc(batch, {right - 2.0f, at.y + 6.0f}, 2.0f, status_color(frame.status));
-    if (frame.chartOpen) {
-        push_text(batch, "sector chart  M", 12.0f, {right, at.y + 20.0f}, TextAlign::Right, NAV,
+    if (suffix && *suffix) {
+        push_text(batch, suffix, 13.0f, {at.x + at.w, at.y}, TextAlign::Right, ETCH_DIM,
                   TextFace::Label);
     }
 }
 
+/** One label/value row of a block: the label dormant, the value at its weight. */
+void block_row(UIBatch &batch, const Rect &at, float y, const char *label, const std::string &value,
+               Weight weight = Weight::Live) {
+    push_text(batch, label, 12.0f, {at.x + 10.0f, y + 2.0f}, TextAlign::Left,
+              with_alpha(ETCH_DIM, weight_opacity(weight)), TextFace::Label);
+    push_text(batch, value.c_str(), 15.0f, {at.x + at.w - 10.0f, y}, TextAlign::Right,
+              with_alpha(weight_color(weight), weight_opacity(weight)));
+}
+
+// The three gauges, and the world-under-the-ship rows: shared by the s4.1 blocks.
 void draw_bars(UIBatch &batch, const HudFrame &frame, const Rect &at) {
     struct BarRow {
         const char *label;
@@ -177,9 +222,6 @@ void draw_bars(UIBatch &batch, const HudFrame &frame, const Rect &at) {
         {"prop", frame.fuelFrac, frame.fuelValue, false},
         {"heat", frame.heatFrac, frame.heatValue, true},
     };
-    // R-1: the first row's value readout starts at the block's own top edge and the layouter placed
-    // the block above the vessel line, so "heat" can no longer draw through the ship's name. The
-    // cluster's old y values (778/812/846 with the name at 852) were the whole of the bug.
     for (int i = 0; i < 3; ++i) {
         const BarRow &row = rows[i];
         const float y = at.y + 8.0f + static_cast<float>(i) * 34.0f;
@@ -197,106 +239,207 @@ void draw_bars(UIBatch &batch, const HudFrame &frame, const Rect &at) {
     }
 }
 
-void draw_vessel(UIBatch &batch, const HudFrame &frame, const Rect &at) {
-    push_text(batch, frame.shipName, 13.0f, {at.x, at.y}, TextAlign::Left, ETCH, TextFace::Label);
-    push_text(batch, frame.assist ? "flight assist  F" : "assist off  F", 11.0f,
-              {at.x + 120.0f, at.y + 2.0f}, TextAlign::Left, frame.assist ? NAV : ETCH_DIM,
-              TextFace::Label);
-    push_text(batch, "kill velocity  X", 11.0f, {at.x + 240.0f, at.y + 2.0f}, TextAlign::Left,
-              frame.braking ? DRIVE : ETCH_DIM, TextFace::Label);
-}
-
-void draw_guns(UIBatch &batch, const HudFrame &frame, const Rect &at) {
-    const float right = at.x + at.w;
-    for (int i = 0; i < frame.gunCount; ++i) {
-        const float x = right - 12.0f - static_cast<float>(frame.gunCount - 1 - i) * 26.0f;
-        const float y = at.y + 6.0f;
-        const bool ready = i < frame.gunsReady;
-        const glm::vec4 color = frame.gunsHot ? THREAT : (ready ? NAV : ETCH_DIM);
-        if (ready) {
-            push_quad(batch, {x, y - 4.0f}, {x + 4.0f, y}, {x, y + 4.0f}, {x - 4.0f, y},
-                      with_alpha(color, 1.0f));
-        } else {
-            push_line(batch, {x - 4.0f, y - 4.0f}, {x + 4.0f, y - 4.0f}, 1.0f,
-                      with_alpha(color, 0.7f));
-            push_line(batch, {x + 4.0f, y - 4.0f}, {x + 4.0f, y + 4.0f}, 1.0f,
-                      with_alpha(color, 0.7f));
-            push_line(batch, {x + 4.0f, y + 4.0f}, {x - 4.0f, y + 4.0f}, 1.0f,
-                      with_alpha(color, 0.7f));
-            push_line(batch, {x - 4.0f, y + 4.0f}, {x - 4.0f, y - 4.0f}, 1.0f,
-                      with_alpha(color, 0.7f));
-        }
-    }
-    push_text(batch, "AC-20  cutter", 11.0f, {right, at.y + 18.0f}, TextAlign::Right, ETCH_DIM,
-              TextFace::Label);
-    if (frame.oreHeld > 0.0) {
-        push_text(batch, readout(static_cast<float>(frame.oreHeld), 0, " ore").c_str(), 12.0f,
-                  {right, at.y + 34.0f}, TextAlign::Right, NAV, TextFace::Label);
-    }
-}
-
 /**
  * The world under the ship (plan 3.2-3.7): altitude, air, the rate of descent, the base on the pad
- * it is standing on, and what the survey and the satellites have to say. A vacuum above a body with
- * no air still gets the altitude row, because that is the number a descent is flown on.
+ * it is standing on, and what the survey and the satellites have to say.
  */
 void draw_worlds(UIBatch &batch, const HudFrame &frame, const Rect &at) {
-    float y = at.y;
+    block_header(batch, at, "WORLD", frame.worldsBody);
+    float y = at.y + 22.0f;
     const auto row = [&](const char *label, const std::string &value, const glm::vec4 &color) {
-        push_text(batch, label, 11.0f, {at.x, y}, TextAlign::Left, ETCH_DIM, TextFace::Label);
-        push_text(batch, value.c_str(), 17.0f, {at.x + 74.0f, y - 4.0f}, TextAlign::Left, color);
-        y += 22.0f;
+        push_text(batch, label, 11.0f, {at.x + 10.0f, y + 2.0f}, TextAlign::Left, ETCH_DIM,
+                  TextFace::Label);
+        push_text(batch, value.c_str(), 15.0f, {at.x + at.w - 10.0f, y}, TextAlign::Right, color);
+        y += 20.0f;
     };
 
-    char buffer[64];
-    std::snprintf(buffer, sizeof buffer, "%.1f km", frame.altitude / 1000.0);
-    row("alt", buffer, ETCH);
+    row("alt", distance_readout(frame.altitude), ETCH);
     if (frame.airDensity > 0.0) {
+        char buffer[64];
         std::snprintf(buffer, sizeof buffer, "%.2e", frame.airDensity);
         row("rho", buffer, ETCH_DIM);
         // The flux in the unit a pilot reads: a megawatt per square metre is a hot entry.
         std::snprintf(buffer, sizeof buffer, "%.2f MW/m2", frame.airFlux / 1.0e6);
         row("q", buffer, frame.airFlux > HEAT_FLUX_FULL * 0.5 ? THREAT : ETCH_DIM);
-        std::snprintf(buffer, sizeof buffer, "%.0f m/s", frame.descentRate);
-        row("descent", buffer, frame.descentRate > 4.0 ? DRIVE : ETCH_DIM);
+        row("descent", speed_readout(frame.descentRate),
+            frame.descentRate > 4.0 ? DRIVE : ETCH_DIM);
     }
     if (frame.landed) {
         row("landed", frame.baseName && *frame.baseName ? frame.baseName : "open ground",
             frame.baseName && *frame.baseName ? NAV : ETCH);
     }
     if (frame.surveyFraction > 0.0) {
-        std::snprintf(buffer, sizeof buffer, "%.0f%%", frame.surveyFraction * 100.0);
-        row("survey", buffer, ETCH_DIM);
+        row("survey", grouped(frame.surveyFraction * 100.0, 0, "%"), ETCH_DIM);
     }
     if (frame.satellitesUp + frame.satellitesPending > 0) {
+        char buffer[40];
         std::snprintf(buffer, sizeof buffer, "%d up  %d due", frame.satellitesUp,
                       frame.satellitesPending);
         row("sats", buffer, ETCH_DIM);
     }
 }
 
-void draw_motion(UIBatch &batch, const HudFrame &frame, const Rect &at) {
-    const float right = at.x + at.w;
-    push_text(batch, readout(static_cast<float>(frame.accelerationG), 2, " g").c_str(), 25.0f,
-              {right, at.y}, TextAlign::Right, ETCH);
-    char heading[16];
-    std::snprintf(heading, sizeof heading, "%03d\u00b0",
-                  static_cast<int>(std::lround(frame.headingDeg)) % 360);
-    push_text(batch, heading, 25.0f, {right, at.y + 32.0f}, TextAlign::Right, ETCH);
+// ---------------------------------------------------------------- the s4.1 blocks
+//
+// KSP's lesson (J7): dense information reads when it is grouped into bounded blocks, each answering
+// one question, with a named header rule the eye can find - and a block that has nothing to say is
+// not drawn at all (s4.2's live()), so the ones below it move up.
+
+constexpr float VESSEL_BARS_H = 96.0f;  // three bar rows
+constexpr float VESSEL_ROWS_H = 60.0f;  // mass, TWR, dv
+
+/** The ship's own numbers: the three gauges, then mass, TWR and the dv budget (s4.1's VESSEL). */
+float vessel_block_height(const HudFrame &frame) {
+    (void)frame;
+    return 22.0f + VESSEL_BARS_H + VESSEL_ROWS_H;
 }
 
-void draw_systems(UIBatch &batch, const HudFrame &frame, const Rect &at) {
-    // Density 3: the numbers a pilot checks when something is wrong rather than when something is
-    // happening. The plan's per-thruster and mass-flow rows land here as the sim grows them.
-    const float right = at.x + at.w;
-    char line[64];
-    std::snprintf(line, sizeof line, "zoom %.2f", static_cast<double>(frame.zoom));
-    push_text(batch, line, 11.0f, {right, at.y}, TextAlign::Right, ETCH_DIM, TextFace::Label);
-    std::snprintf(line, sizeof line, "thrust %+.2f", static_cast<double>(frame.thrust));
-    push_text(batch, line, 11.0f, {right, at.y + 14.0f}, TextAlign::Right, ETCH_DIM,
+void build_vessel_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
+    block_header(batch, at, "VESSEL", frame.shipName);
+    Rect bars = at;
+    bars.y += 22.0f;
+    bars.h = VESSEL_BARS_H;
+    draw_bars(batch, frame, bars);
+    const float rows_y = at.y + 22.0f + VESSEL_BARS_H;
+    block_row(batch, at, rows_y, "mass", grouped(frame.massTonnes, 1) + " t", Weight::Dormant);
+    // s4.6: a TWR with no dominant body prints the dash, never a zero.
+    block_row(batch, at, rows_y + 20.0f, "TWR",
+              frame.twrValid ? readout(static_cast<float>(frame.twr), 2, "") : std::string("--"),
+              frame.twrValid && frame.twr < 1.0 ? Weight::Critical : Weight::Live);
+    block_row(batch, at, rows_y + 40.0f, "\xce\x94v", speed_readout(frame.deltaV),
+              frame.deltaV <= 0.01 ? Weight::Critical : Weight::Live);
+}
+
+/** Guns and tubes. Mining forces it on (the ore count is the job's readout); incoming fire forces
+ *  it harder (s4.5). A magazine that is empty reads dry - it does not silently stop (s5.5). */
+float weapons_block_height(const HudFrame &frame) {
+    return 22.0f + 20.0f * (static_cast<float>(frame.gunCount) + 1.0f);
+}
+
+void build_weapons_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
+    block_header(batch, at, "WEAPONS");
+    const float rows_y = at.y + 22.0f;
+    for (int i = 0; i < frame.gunCount; ++i) {
+        const bool ready = i < frame.gunsReady;
+        char mount[8];
+        std::snprintf(mount, sizeof mount, "PDC %c", 'A' + i);
+        block_row(batch, at, rows_y + 20.0f * static_cast<float>(i), mount,
+                  frame.gunsHot ? "hot" : ready ? "ready" : "dry",
+                  frame.gunsHot ? Weight::Critical : ready ? Weight::Live : Weight::Dormant);
+    }
+    block_row(batch, at, rows_y + 20.0f * static_cast<float>(frame.gunCount), "cutter",
+              frame.oreHeld > 0.0 ? grouped(frame.oreHeld, 0, " ore")
+                                  : std::string(frame.forceGuns ? "engaged" : "stowed"),
+              frame.forceGuns ? Weight::Live : Weight::Dormant);
+}
+
+/** The first planned node (s4.1's NODE): dv, burn time, and the countdown. Gone when the node is
+ *  consumed - it never shows a negative T- (s4.6). */
+float node_block_height(const HudFrame &frame) {
+    return frame.nodeValid ? 22.0f + 20.0f * 3 : 0.0f;
+}
+
+void build_node_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
+    if (!frame.nodeValid) return;
+    block_header(batch, at, "NODE", "circularise");
+    const float rows_y = at.y + 22.0f;
+    block_row(batch, at, rows_y, "\xce\x94v", speed_readout(frame.nodeDeltaV));
+    block_row(batch, at, rows_y + 20.0f, "burn", frame.nodeBurnSeconds > 0.0
+                                                      ? span_readout(frame.nodeBurnSeconds)
+                                                      : std::string("instant"));
+    block_row(batch, at, rows_y + 40.0f, "T-", span_readout(std::max(0.0, frame.nodeTMinus)),
+              frame.nodeTMinus < 60.0 ? Weight::Critical : Weight::Live);
+}
+
+/** Incoming fire (s4.5, s5): the one block the pilot does not get to ignore. */
+float threat_block_height(const HudFrame &frame) {
+    return frame.underFire ? 22.0f + 20.0f : 0.0f;
+}
+
+void build_threat_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
+    if (!frame.underFire) return;
+    block_header(batch, at, "THREAT");
+    block_row(batch, at, at.y + 22.0f, "hull", readout(frame.hullValue, 0, ""), Weight::Critical);
+}
+
+/** The top strip: contract and progress on the left, the world under the ship in the middle, the
+ *  session clock and the warp rail on the right. Not a block - it is the frame the blocks sit in. */
+void draw_top_strip(UIBatch &batch, const HudFrame &frame, const Rect &safe) {
+    const float right = safe.x + safe.w;
+    push_text(batch, "OPRA", 22.0f, {safe.x, safe.y}, TextAlign::Left, ETCH);
+    if (frame.contractId && *frame.contractId) {
+        push_text(batch, frame.contractId, 13.0f, {safe.x + 92.0f, safe.y + 2.0f}, TextAlign::Left,
+                  ETCH_DIM, TextFace::Label);
+    }
+    if (frame.objective && *frame.objective) {
+        push_text(batch, frame.objective, 15.0f, {safe.x + 92.0f, safe.y + 20.0f}, TextAlign::Left,
+                  ETCH, TextFace::Label);
+    }
+    push_rect(batch, {safe.x, safe.y + 44.0f}, {232.0f, 1.0f}, with_alpha(ETCH, 0.15f));
+    push_rect(batch, {safe.x, safe.y + 44.0f}, {232.0f * ui::clamp01(frame.progress), 1.0f}, NAV);
+
+    // The world under the ship (s4.1's top-middle): altitude and vertical speed, the two numbers a
+    // descent is flown on.
+    if (frame.worldsValid) {
+        const float centre_x = safe.x + safe.w * 0.5f;
+        push_text(batch, distance_readout(frame.altitude).c_str(), 25.0f, {centre_x, safe.y},
+                  TextAlign::Center, ETCH);
+        const Weight vs_weight = frame.verticalSpeed < -4.0   ? Weight::Critical
+                                 : frame.verticalSpeed > 4.0 ? Weight::Live
+                                                             : Weight::Dormant;
+        char vs[48];
+        std::snprintf(vs, sizeof vs, "%s %s m/s",
+                      frame.verticalSpeed > 0.0 ? "\xe2\x96\xb2" : "\xe2\x96\xbc",
+                      grouped(frame.verticalSpeed, 1).c_str());
+        push_text(batch, vs, 15.0f, {centre_x, safe.y + 30.0f}, TextAlign::Center,
+                  with_alpha(weight_color(vs_weight), weight_opacity(vs_weight)), TextFace::Label);
+    }
+
+    char clock[40];
+    const int total = static_cast<int>(std::max(0.0f, frame.sessionSeconds));
+    std::snprintf(clock, sizeof clock, "T+ %02d:%02d:%02d", total / 3600, total % 3600 / 60,
+                  total % 60);
+    push_text(batch, clock, 15.0f, {right, safe.y}, TextAlign::Right, ETCH);
+    push_disc(batch, {right - 2.0f, safe.y + 6.0f}, 2.0f, status_color(frame.status));
+    char warp[48];
+    if (frame.warpSuggest > frame.warpRate + 0.01 && frame.warpRate <= 1.0) {
+        // The rail's suggestion (s2.7): shown, never applied silently.
+        std::snprintf(warp, sizeof warp, "warp %gx  \xe2\x96\xb3 %gx", frame.warpRate,
+                      frame.warpSuggest);
+    } else {
+        std::snprintf(warp, sizeof warp, "warp %gx", frame.warpRate);
+    }
+    push_text(batch, warp, 12.0f, {right, safe.y + 22.0f}, TextAlign::Right, ETCH_DIM,
               TextFace::Label);
-    std::snprintf(line, sizeof line, "warp %gx", frame.warpRate);
-    push_text(batch, line, 11.0f, {right, at.y + 28.0f}, TextAlign::Right, ETCH_DIM,
+}
+
+/** The bottom strip: throttle, g, heading, and the keys that are always live. */
+void draw_bottom_strip(UIBatch &batch, const HudFrame &frame, const Rect &safe) {
+    const float y = safe.y + safe.h - 30.0f;
+    const float bar_w = 120.0f;
+    push_text(batch, "throttle", 11.0f, {safe.x, y + 6.0f}, TextAlign::Left, ETCH_DIM,
+              TextFace::Label);
+    push_rect(batch, {safe.x + 58.0f, y + 12.0f}, {bar_w, 3.0f}, with_alpha(ETCH, 0.12f));
+    push_rect(batch, {safe.x + 58.0f, y + 12.0f}, {bar_w * ui::clamp01(frame.throttle), 3.0f},
+              DRIVE);
+    push_text(batch, readout(ui::clamp01(frame.throttle), 2, "").c_str(), 15.0f,
+              {safe.x + 58.0f + bar_w + 10.0f, y}, TextAlign::Left, ETCH);
+
+    const float centre_x = safe.x + safe.w * 0.5f;
+    char g[32];
+    std::snprintf(g, sizeof g, "%.2f g", frame.accelerationG);
+    push_text(batch, g, 15.0f, {centre_x - 60.0f, y}, TextAlign::Right, ETCH);
+    char hdg[16];
+    std::snprintf(hdg, sizeof hdg, "%03d\xc2\xb0",
+                  static_cast<int>(std::lround(frame.headingDeg)) % 360);
+    push_text(batch, hdg, 15.0f, {centre_x + 60.0f, y}, TextAlign::Left, ETCH);
+
+    const float right = safe.x + safe.w;
+    push_text(batch, frame.assist ? "assist F" : "assist off F", 11.0f, {right - 210.0f, y + 4.0f},
+              TextAlign::Left, frame.assist ? NAV : ETCH_DIM, TextFace::Label);
+    push_text(batch, "kill X", 11.0f, {right - 120.0f, y + 4.0f}, TextAlign::Left,
+              frame.braking ? DRIVE : ETCH_DIM, TextFace::Label);
+    push_text(batch, "warp . ,", 11.0f, {right, y + 4.0f}, TextAlign::Right, ETCH_DIM,
               TextFace::Label);
 }
 
@@ -307,31 +450,85 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
     const float height = frame.screen.y;
     const glm::vec2 centre = frame.shipScreen;
 
-    // D-18: one safe-area inset for the whole layout - 28 px, or 3% of the short edge, whichever
-    // is larger. Every block hangs inside it; no block carries a margin of its own.
+    // D-18: one safe-area inset for the whole layout - 28 px, or 3% of the short edge.
     const float inset = std::max(28.0f, std::min(width, height) * 0.03f);
     const Rect safe{inset, inset, width - inset * 2.0f, height - inset * 2.0f};
-    // The columns are fractions of the safe area, so a narrow window has the same four stacks with
-    // less room rather than two stacks drawn through each other.
-    const float left_column = std::min(440.0f, safe.w * 0.5f);
-    const float right_column = std::min(300.0f, safe.w * 0.42f);
+    const bool narrow = safe.w < 1000.0f;  // s4.6: the right column collapses under the left
+    const float column_w = 300.0f;
 
     float radius = frame.radius > 0.0f ? frame.radius
                                        : std::clamp(std::min(width, height) * 0.29f, 150.0f, 260.0f);
     radius = std::min(radius, std::min(width, height) * 0.5f - LABEL_RADIUS - 4.0f);
 
-    // The collar and the centre marks are not blocks: a bearing ring has to sit on the ship, and
-    // the ship is wherever the follow put it. They are drawn from `centre` and are exempt from the
-    // layout pass by omission (hud/blocks.h says why).
+    draw_top_strip(batch, frame, safe);
+    draw_bottom_strip(batch, frame, safe);
+
+    // The columns start below the top strip and stop above the bottom strip.
+    const Rect columns{safe.x, safe.y + 70.0f, safe.w, safe.h - 110.0f};
+    const Rect left_column{columns.x, columns.y, column_w, columns.h};
+    const Rect right_base{columns.x + columns.w - column_w, columns.y, column_w, columns.h};
+
+    // Left column, downward. Every block answers live() first (s4.2): the layouter is the cursor,
+    // so a block that stays home lets the ones below it move up.
+    BlockLayouter left(left_column, true);
+    build_vessel_block(batch, frame, left.place("vessel", vessel_block_height(frame)));
+    if (density_at_least(frame.density, Density::Two) || frame.forceGuns || frame.underFire) {
+        build_weapons_block(batch, frame, left.place("weapons", weapons_block_height(frame)));
+    }
+    if (frame.director.active &&
+        (density_at_least(frame.density, Density::Two) || frame.forceProgram)) {
+        build_program_block(batch, frame, left.place("program", program_block_height(frame)));
+    }
+    if (frame.worldsValid &&
+        (density_at_least(frame.density, Density::Two) || frame.landed || frame.airDensity > 0.0)) {
+        const int rows = 1 + (frame.airDensity > 0.0 ? 3 : 0) + (frame.landed ? 1 : 0) +
+                         (frame.surveyFraction > 0.0 ? 1 : 0) +
+                         (frame.satellitesUp + frame.satellitesPending > 0 ? 1 : 0);
+        draw_worlds(batch, frame, left.place("worlds", static_cast<float>(rows) * 22.0f + 6.0f));
+    }
+    if (frame.underFire) {
+        build_threat_block(batch, frame, left.place("threat", threat_block_height(frame)));
+    }
+
+    // Right column: orbit, node, minimap. Narrow windows stack it under the left column's last
+    // block, which is the s4.6 rule - blocks stack rather than overlap.
+    Rect right_rect = right_base;
+    if (narrow) {
+        float used = columns.y;
+        for (const BlockRect &block : left.blocks()) {
+            used = std::max(used, block.at.y + block.at.h);
+        }
+        right_rect.y = used + 12.0f;
+    }
+    BlockLayouter right(right_rect, true);
+    if (frame.orbit.valid &&
+        (density_at_least(frame.density, Density::Two) || frame.forceOrbit)) {
+        build_orbit_block(batch, frame, right.place("orbit", orbit_block_height(frame)));
+    }
+    if (frame.nodeValid) {
+        build_node_block(batch, frame, right.place("node", node_block_height(frame)));
+    }
+    if (frame.minimap.active && density_at_least(frame.density, Density::Two)) {
+        build_minimap(batch, frame.minimap,
+                      right.place("minimap", minimap_block_height(frame.minimap)));
+    }
+
+    // ---- the collar: the navball analogue (s4.4) ------------------------------------------
     if (!frame.hideCollar && radius >= 12.0f) {
         // The ring: a full circle less the deliberate 40 degree gap at the top.
         push_arc(batch, centre, radius, TOP + GAP_HALF, TOP - GAP_HALF + TAU, RING_WIDTH,
                  with_alpha(ETCH_DIM, RING_ALPHA));
 
-        // Range rings: the collar's only scale, FAR_RANGE landing exactly on the ring.
+        // Range rings (S-2): the labels sit on the 45-degree diagonals and never on the hull - a
+        // ring that would land inside the ship's own screen disc draws neither arc nor label,
+        // whatever the zoom is doing. Under a 160 px collar the labels go entirely.
         for (float metres : RANGE_RING_METRES) {
             const float r = radius * (metres / FAR_RANGE);
-            push_arc(batch, centre, r, 0.0f, TAU, 1.0f, with_alpha(ETCH_DIM, RANGE_RING_ALPHA));
+            const bool under_hull = r < frame.shipRadiusPx + 8.0f;
+            if (!under_hull) {
+                push_arc(batch, centre, r, 0.0f, TAU, 1.0f, with_alpha(ETCH_DIM, RANGE_RING_ALPHA));
+            }
+            if (under_hull || radius < 160.0f) continue;
             const std::string label = readout(metres, 0, " m");
             const glm::vec2 at(
                 centre.x + std::cos(RANGE_RING_LABEL_ANGLE) * (r + RANGE_RING_LABEL_GAP),
@@ -382,6 +579,37 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
             }
         }
 
+        // The navball marks (s4.4): a vector the pilot flies by gets a place on the ring.
+        // Prograde style is a circle with a dot; retrograde, the circle with a bar.
+        const auto collar_mark = [&](float bearing_rad, const glm::vec4 &color, bool prograde) {
+            const glm::vec2 u(std::cos(-bearing_rad), std::sin(-bearing_rad));
+            const glm::vec2 t(-u.y, u.x);
+            const glm::vec2 at = centre + u * radius;
+            push_arc(batch, at, 5.0f, 0.0f, TAU, 1.4f, color);
+            if (prograde) {
+                push_disc(batch, at, 1.6f, color);
+            } else {
+                push_line(batch, at - t * 5.0f, at + t * 5.0f, 1.4f, color);
+            }
+        };
+        // Prograde / retrograde from the world-frame velocity, target / anti-target from the
+        // tracked contact's bearing.
+        if (frame.speed > 0.5) {
+            const float bearing =
+                static_cast<float>(std::atan2(frame.velocityDir.y, frame.velocityDir.x) -
+                                   1.5707963267948966);
+            collar_mark(bearing, NAV, true);
+            collar_mark(bearing + 3.14159265f, with_alpha(NAV, 0.55f), false);
+        }
+        if (frame.targetValid) {
+            float rel_bearing = 0.0f;
+            for (const CollarMark &mark : frame.marks) {
+                if (mark.kind == MarkKind::Target) rel_bearing = mark.bearing;
+            }
+            collar_mark(rel_bearing, with_alpha(ETCH, 0.9f), true);
+            collar_mark(rel_bearing + 3.14159265f, with_alpha(ETCH, 0.45f), false);
+        }
+
         // The marks.
         for (const CollarMark &mark : frame.marks) {
             // World is +x right / +y up, the HUD is y-down: a bearing b is HUD angle -b.
@@ -404,10 +632,6 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
                     const glm::vec4 color = with_alpha(NAV, 0.7f + 0.3f * strength);
                     push_line(batch, base + t * TARGET_ARM, tip, TARGET_WIDTH, color);
                     push_line(batch, tip, base - t * TARGET_ARM, TARGET_WIDTH, color);
-                    const std::string range = readout(mark.range, 0, " m");
-                    push_text(batch, range.c_str(), 25.0f,
-                              centre + u * (radius + LABEL_RADIUS) - glm::vec2(0.0f, 14.0f),
-                              TextAlign::Center, with_alpha(NAV, far));
                     break;
                 }
                 case MarkKind::Hostile: {
@@ -427,9 +651,7 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
         }
     }
 
-    // The director's cross (G8): where the cue wants the nose, drawn at the cue's bearing on the
-    // collar's own ring, in the frame every mark uses. It is placed by the collar's geometry and is
-    // not part of it.
+    // The director's cross (G8): where the cue wants the nose, on the collar's own ring.
     if (!frame.hideCollar && radius >= 12.0f && frame.director.active) {
         constexpr float CROSS_OUT = 10.0f;
         constexpr float CROSS_ARM = 6.0f;
@@ -445,56 +667,7 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
         push_arc(batch, at, CROSS_ARM + 2.0f, 0.0f, TAU, 1.0f, with_alpha(cross_color, 0.55f));
     }
 
-    // ---- the four corners, each one a stack of blocks
-    BlockLayouter top_left({safe.x, safe.y, left_column, safe.h}, true);
-    BlockLayouter top_right({safe.x + safe.w - right_column, safe.y, right_column, safe.h}, true);
-    BlockLayouter bottom_left({safe.x, safe.y, left_column, safe.h}, false);
-    BlockLayouter bottom_right({safe.x + safe.w - right_column, safe.y, right_column, safe.h},
-                               false);
-
-    const Density density = frame.density;
-    draw_mark(batch, frame, top_left.place("mark", 72.0f));
-    draw_session(batch, frame, top_right.place("session", frame.chartOpen ? 40.0f : 26.0f));
-    // F5: the minimap is one block in one corner at one footprint, its contents set by the mode.
-    if (frame.minimap.active && density_at_least(density, Density::Two)) {
-        build_minimap(batch, frame.minimap,
-                      top_right.place("minimap", minimap_block_height(frame.minimap)));
-    }
-    draw_motion(batch, frame, bottom_right.place("motion", 70.0f));
-    // Level 2 adds the guns and the ship's own line ("Kestrel  flight assist  kill velocity").
-    // Mining forces the guns on at any level: the ore count is the readout of the job in hand.
-    if (density_at_least(density, Density::Two) || frame.forceGuns) {
-        draw_guns(batch, frame, bottom_right.place("guns", 56.0f));
-    }
-    // The director's panel (G8) and the orbit block are level 2, and either can be forced back on
-    // by the context: a failing gate is the readout, and an SOI change is the moment the conic
-    // changes under the ship (plan 4.6, F10).
-    if (frame.director.active && (density_at_least(density, Density::Two) || frame.forceProgram)) {
-        build_program_block(batch, frame, bottom_right.place("program", program_block_height(frame)));
-    }
-    if (frame.orbit.valid && (density_at_least(density, Density::Two) || frame.forceOrbit)) {
-        build_orbit_block(batch, frame, bottom_right.place("orbit", orbit_block_height(frame)));
-    }
-    if (density_at_least(density, Density::Three)) {
-        draw_systems(batch, frame, bottom_right.place("systems", 46.0f));
-    }
-    if (frame.worldsValid &&
-        (density_at_least(density, Density::Two) || frame.landed || frame.airDensity > 0.0)) {
-        // The rows it can offer decide its height, so the cursor does the same job here as it does
-        // for every other block: nothing is placed by hand.
-        const int rows = 1 + (frame.airDensity > 0.0 ? 3 : 0) + (frame.landed ? 1 : 0) +
-                         (frame.surveyFraction > 0.0 ? 1 : 0) +
-                         (frame.satellitesUp + frame.satellitesPending > 0 ? 1 : 0);
-        draw_worlds(batch, frame, bottom_left.place("worlds", static_cast<float>(rows) * 22.0f));
-    }
-    if (density_at_least(density, Density::Two)) {
-        draw_vessel(batch, frame, bottom_left.place("vessel", 26.0f));
-    }
-    draw_bars(batch, frame, bottom_left.place("bars", 104.0f));
-
     // ---- centre: the two vectors the pilot flies by, then the readouts under the ship
-    // Velocity: a line from the ship along where it is actually going, scaled by speed, with a
-    // tick across its tip. The nose may point anywhere.
     if (frame.speed > 0.5) {
         const float length_px = std::min(24.0f + static_cast<float>(frame.speed) * 1.35f, 190.0f);
         const glm::vec2 tip = frame.shipScreen + frame.velocityDir * length_px;
@@ -502,7 +675,6 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
         const glm::vec2 across(-frame.velocityDir.y, frame.velocityDir.x);
         push_line(batch, tip - across * 5.0f, tip + across * 5.0f, 1.5f, with_alpha(NAV, 0.85f));
     }
-    // Nose: a short tick ahead of the hull so the facing is never in doubt.
     if (!frame.wrecked) {
         const glm::vec2 nose_tip = frame.shipScreen + frame.noseDir * (frame.shipRadiusPx + 22.0f);
         push_line(batch, frame.shipScreen + frame.noseDir * (frame.shipRadiusPx + 6.0f), nose_tip,
@@ -521,19 +693,24 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
             push_text(batch, "m/s", 11.0f, {centre.x, under_ship + 50.0f}, TextAlign::Center,
                       ETCH_DIM, TextFace::Label);
         }
+        if (frame.targetValid) {
+            // The tracked contact's range: the collar's target mark says where, this says how far.
+            push_text(batch, distance_readout(frame.targetRange).c_str(), 17.0f,
+                      {centre.x, under_ship + (frame.speed > 0.05 ? 66.0f : 0.0f)},
+                      TextAlign::Center, with_alpha(NAV, 0.9f), TextFace::Label);
+        }
         if (frame.context && *frame.context) {
             push_text(batch, frame.context, 12.0f,
-                      {centre.x, under_ship + (frame.speed > 0.05 ? 70.0f : 8.0f)},
+                      {centre.x, under_ship + (frame.speed > 0.05 ? 92.0f : 26.0f)},
                       TextAlign::Center, frame.contextColor, TextFace::Label);
         }
     }
 
     // The layout assertion pass (plan 5.2): under --debug every block is checked against the safe
-    // area, against its siblings and against the texts anchored inside it. This is the check that
-    // would have caught R-1 on the frame it was written.
+    // area, against its siblings and against the texts anchored inside it.
     if (frame.debug) {
         std::vector<BlockRect> blocks;
-        for (const BlockLayouter *corner : {&top_left, &top_right, &bottom_left, &bottom_right}) {
+        for (const BlockLayouter *corner : {&left, &right}) {
             blocks.insert(blocks.end(), corner->blocks().begin(), corner->blocks().end());
         }
         check_block_layout(blocks, batch, safe, true);

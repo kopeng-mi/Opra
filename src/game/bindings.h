@@ -43,12 +43,14 @@ enum class Action {
     /** Time warp, stepped: 1 / 10 / 100 / 1k / 10k / 100k. Above 10x the ship rides its conic. */
     WarpUp,
     WarpDown,
-    /** The system map: the orrery and the ephemeris, with true scale on Y. */
+    /** System scale: one continuous zoom replaced the map screen (plan 05 J2); M is there-and-back. */
     Map,
-    TrueScale,
     /** The planner: insert the selected body's transfer burns, and advance to the first of them. */
     PlanNode,
     WarpToNode,
+    /** Close quarters (plan 05 s5): the PDCs' release, and a torpedo away at the tracked contact. */
+    WeaponsFree,
+    FireTorpedo,
 };
 
 struct Binding {

@@ -15,7 +15,7 @@ inline constexpr double WARP_MAX_ADVANCE = 86400.0;
 
 struct Warp {
     /** Why the warp dropped itself, for the HUD to say. `None` means it is still up. */
-    enum class Drop { None, Thrust, Contact, Sphere, Air, Manual };
+    enum class Drop { None, Thrust, Contact, Sphere, Air, Manual, Zoom };
 
     int step = 0;
     Drop drop = Drop::None;

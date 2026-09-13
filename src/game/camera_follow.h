@@ -44,22 +44,30 @@ void follow_snap(FollowState &state, const glm::dvec2 &ship, const glm::dvec2 &s
                  const FollowParams &params);
 
 /**
- * One grab step of the hand on the camera (A4): Ctrl and the mouse, a grab of the plane itself.
- * `anchor_world` is the world point unprojected under the cursor when Ctrl went down;
- * `cursor_world` is the same unprojection for where the cursor sits now. The pan moves by their
- * difference, so after the step the anchor is back under the cursor - exactly, at any pitch and any
- * zoom, because the projection does the work instead of a pixels-to-metres scale that is only true
- * on one screen row. There is deliberately no magnitude clamp: the release's ease back (below) is
- * what keeps a look a look, and a clamp mid-drag would tear the ground off the cursor.
+ * One look step of the camera's freedom (plan 05 J1): Ctrl and the mouse swing the *eye* about the
+ * follow point, inside a cone about the home axis. `anchor_px` is where the cursor was when Ctrl
+ * went down; `cursor_px` is where it sits now; both in pixels, with `height` the viewport height.
+ * The drag maps to an angular offset - azimuth on x, elevation on y - clamped to the cone, so the
+ * frame can swing anywhere within thirty degrees of home and never further, and it can never invert
+ * or roll: the collar's world north survives any look.
  *
- * The pan is an offset on the follow point, not a change to it: release the key and `pan_release`
- * walks it back, so a look is a look and never a new home. Pitch is not in this API at all - it is
- * read from settings once, at camera construction (F1).
+ * This replaces the plan-04 plane grab: with one continuous zoom the eye has to stay near the
+ * follow point at every scale, and an unbounded pan at system zoom would lose the ship outright.
  */
-void look_step(glm::dvec2 &pan, const glm::dvec2 &anchor_world, const glm::dvec2 &cursor_world);
+void look_cone_step(glm::dvec2 &cone, double anchor_x, double anchor_y, double cursor_x,
+                    double cursor_y, double height);
 
-/** The pan eased back to nothing once the pilot lets go: exact exp(-dt/tau), frame-rate clean. */
-glm::dvec2 pan_release(const glm::dvec2 &pan, Real dt, double tau);
+/** The angle eased back to home once the pilot lets go: exact exp(-dt/tau), frame-rate clean. */
+glm::dvec2 look_cone_release(const glm::dvec2 &cone, Real dt, double tau);
+
+/** The cone clamp: a look may lean thirty degrees from home in any direction, and no further. */
+glm::dvec2 look_cone_clamp(const glm::dvec2 &cone);
+
+/**
+ * The eye offset for a look: the home orbit swung by `cone` radians (x = azimuth about world up,
+ * y = elevation). Elevation stays inside the camera's own limits whatever the cone does.
+ */
+glm::vec3 look_eye(double half_height, float pitch, const glm::dvec2 &cone);
 
 /** One step of the follow. Returns the new centre; `state` is updated in place. */
 glm::dvec2 follow_step(FollowState &state, const glm::dvec2 &ship, const glm::dvec2 &ship_velocity,

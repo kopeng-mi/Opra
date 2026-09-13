@@ -3,31 +3,31 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -107.5,
-      -68,
+      -106.5015,
+      -68.6704,
       -16
     ],
     "max": [
-      107.5,
-      68,
+      106.5015,
+      68.6704,
       16
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -107.5,
-      -68,
+      -106.5015,
+      -68.6704,
       -16
     ],
     "max": [
-      107.5,
-      68,
+      106.5015,
+      68.6704,
       16
     ]
   },
   "collider": {
-    "halfLength": 68,
-    "halfWidth": 107.5,
+    "halfLength": 68.67,
+    "halfWidth": 106.502,
     "shapes": [
       {
         "kind": "circle",
@@ -35,7 +35,7 @@
           0,
           0
         ],
-        "radius": 66.9362
+        "radius": 66.745
       },
       {
         "kind": "box",
@@ -45,12 +45,12 @@
         ],
         "angle": 0,
         "half": [
-          95.525,
-          4.2
+          96.1147,
+          5.0201
         ]
       }
     ],
-    "bounds_radius": 108.0614
+    "bounds_radius": 107.2095
   },
   "ports": [
     {
@@ -157,7 +157,7 @@
   "stats": {},
   "counts": {
     "meshes": 14,
-    "vertices": 69876,
-    "triangles": 23292
+    "vertices": 22128,
+    "triangles": 7376
   }
 }

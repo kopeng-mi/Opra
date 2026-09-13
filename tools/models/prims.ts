@@ -82,12 +82,14 @@ export function plate(root: THREE.Group, outline: number[][], depth: number, z: 
 
 /** One engine bell plus its authoring-hidden flame cone. */
 export function drive(root: THREE.Group, x: number, y: number, radius: number, flames: THREE.Mesh[]) {
-  cylinder(root, metal, radius * 0.65, radius, 13, [x, y + 4, 0]);
-  cylinder(root, dark, radius * 0.9, radius * 1.1, 6, [x, y - 5, 0]);
-  cylinder(root, black, radius, radius, 0.8, [x, y - 8.2, 0]);
-  cylinder(root, glow, radius * 0.72, radius * 0.72, 0.5, [x, y - 8.8, 0]);
+  // Segment counts and thicknesses hold to plan 05 s3.2: the nozzle furniture is 1.5 m thick at
+  // the thinnest, and eight segments turn a bell for a twentieth of the old triangle cost.
+  cylinder(root, metal, radius * 0.65, radius, 13, [x, y + 4, 0], 8);
+  cylinder(root, dark, radius * 0.9, radius * 1.1, 6, [x, y - 5, 0], 8);
+  cylinder(root, black, radius, radius, 1.5, [x, y - 8.2, 0], 8);
+  cylinder(root, glow, radius * 0.72, radius * 0.72, 1.5, [x, y - 9.0, 0], 8);
   // The base is at the nozzle; scaling length never pulls the flame off its engine.
-  const geometry = new THREE.ConeGeometry(radius * 0.83, 36, 12, 1, true);
+  const geometry = new THREE.ConeGeometry(radius * 0.83, 36, 8, 1, true);
   geometry.rotateZ(Math.PI); geometry.translate(0, -18, 0);
   const flame = new THREE.Mesh(geometry, exhaust);
   flame.name = 'flame'; flame.userData.effect = true;
@@ -912,7 +914,18 @@ export function tube(parent: THREE.Object3D, material: THREE.Material, top: numb
 /** A box with bevelled structural edges: what every piece of hull framing should have been. */
 export function bevelled(parent: THREE.Object3D, material: THREE.Material, size: number[], pos: number[], rot: number[] = [0, 0, 0], options: { radius?: number; segments?: number } = {}): THREE.Mesh {
   const radius = Math.min(options.radius ?? 0.55, Math.min(size[0], size[1], size[2]) * 0.42);
-  const geometry = new RoundedBoxGeometry(size[0], size[1], size[2], options.segments ?? 2, radius);
+  // A roundover under half a metre is sub-pixel at any range the part is seen from, and structure
+  // fields place hundreds of these - so small-radius, unrefined bevels degrade to plain boxes
+  // (plan 05 s3's budget). A real roundover still costs a RoundedBox.
+  if (radius < 0.5 && (options.segments ?? 0) <= 1) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), material);
+    mesh.position.set(pos[0], pos[1], pos[2]);
+    mesh.rotation.set(rot[0], rot[1], rot[2]);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  }
+  const geometry = new RoundedBoxGeometry(size[0], size[1], size[2], Math.min(options.segments ?? 0, 1), radius);
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(pos[0], pos[1], pos[2]);
   mesh.rotation.set(rot[0], rot[1], rot[2]);
@@ -1001,7 +1014,7 @@ export function sensor_dish(parent: THREE.Object3D, opts: { radius?: number; dep
 }
 
 /** A cylinder spanning two points: the truss primitive. */
-export function strut(parent: THREE.Object3D, material: THREE.Material, from: number[], to: number[], radius = 0.5, segments = 8): THREE.Mesh {
+export function strut(parent: THREE.Object3D, material: THREE.Material, from: number[], to: number[], radius = 0.5, segments = 6): THREE.Mesh {
   const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to);
   const length = a.distanceTo(b);
   const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, Math.max(1e-3, length), segments, 1, false), material);
@@ -1026,13 +1039,14 @@ export function truss_box(parent: THREE.Object3D, material: THREE.Material, leng
     const y0 = -length / 2 + (bay / bays) * length;
     const y1 = -length / 2 + ((bay + 1) / bays) * length;
     for (let c = 0; c < 4; c++) {
-      strut(group, material, at(corners[c], y1), at(corners[(c + 1) % 4], y1), radius * 0.75, 6);
-      strut(group, material, at(corners[c], y0), at(corners[(c + 1) % 4], y0), radius * 0.75, 6);
-      strut(group, material, at(corners[c], y0), at(corners[(c + 1) % 4], y1), radius * 0.55, 6);
-      if (bay < bays - 1) strut(group, material, at(corners[c], y1), at(corners[c], y1), radius * 0.3, 4);
+      // Four segments a strut: a truss is read in silhouette, and a fat prism reads the same as a
+      // fat cylinder at every range the truss is seen from (plan 05 s3's budget).
+      strut(group, material, at(corners[c], y1), at(corners[(c + 1) % 4], y1), radius * 0.75, 4);
+      strut(group, material, at(corners[c], y0), at(corners[(c + 1) % 4], y0), radius * 0.75, 4);
+      strut(group, material, at(corners[c], y0), at(corners[(c + 1) % 4], y1), radius * 0.55, 4);
     }
   }
-  for (let c = 0; c < 4; c++) strut(group, material, at(corners[c], -length / 2), at(corners[c], length / 2), radius, 8);
+  for (let c = 0; c < 4; c++) strut(group, material, at(corners[c], -length / 2), at(corners[c], length / 2), radius, 4);
   parent.add(group);
   return group;
 }
@@ -1182,3 +1196,21 @@ const PALETTE: Record<string, THREE.Material> = {
   frame, hullPaint, hazardPaint, deckPlate, solarCell, insulation, rock,
 };
 for (const [name, material] of Object.entries(PALETTE)) material.name = name;
+
+/**
+ * Plan 05 s3.2: the authoring-time backstop. A feature under the 1.5 m floor is noise at the home
+ * framing - it averages into the hull - so the helper throws while authoring, and the exporter's
+ * audit (s3.3) stays the second line of defence instead of the first.
+ */
+export const MIN_FEATURE_M = 1.5;
+
+/** Throws when any dimension of  is under the minimum feature floor. */
+export function min_feature(size: number[], name: string): void {
+  const smallest = Math.min(...size.map((v) => Math.abs(v)));
+  if (smallest < MIN_FEATURE_M) {
+    throw new Error(
+      name + ': feature ' + smallest.toFixed(2) + ' m is under the ' + MIN_FEATURE_M +
+        ' m floor (plan 05 s3.2) - delete it, widen it, or move it to a normal map',
+    );
+  }
+}

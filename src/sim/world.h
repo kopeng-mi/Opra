@@ -7,6 +7,7 @@
 #include <deque>
 #include <vector>
 
+#include "sim/combat.h"
 #include "sim/dock.h"
 #include "sim/descent.h"
 #include "sim/terrain.h"
@@ -99,6 +100,17 @@ struct World {
     std::vector<std::vector<SurveyArc>> scanned;
     /** Deployed satellites and their orbit checks (plan 3.7). */
     std::vector<Satellite> satellites;
+    /** The survey's discoveries (plan 05 s6.1); `found` is permanent for the run. A derelict, an
+     *  anomalous mass or a cached depot the scan sweep crossed: positions are deterministic in the
+     *  body's own seed, so a system file describes them and nothing is hardcoded. */
+    struct Discovery {
+        std::string name;
+        std::string kind;  // "derelict", "anomaly", "depot"
+        int body = -1;
+        double theta = 0.0;
+        bool found = false;
+    };
+    std::vector<Discovery> discoveries;
     /** The body the ship is standing on, or -1 while it is flying (plan 3.4). */
     int landed_body = -1;
     /** Seconds of simulator time since touchdown; -1 while flying. */
@@ -119,6 +131,24 @@ struct World {
     std::string base_name;
 
     std::vector<Contact> contacts() const;
+
+    // -------------------------------------------------------------- close quarters (plan 05 s5)
+    /** Rounds and torpedoes in flight. Any of either forces the warp rail to 1x (s2.7). */
+    std::vector<Round> rounds;
+    std::vector<Torpedo> torpedoes;
+    /** The PDC mounts, ship-frame metres, read from the hull's sidecar hardpoints. */
+    std::vector<Vec2> pdc_mounts;
+    /** True when the PDCs may engage the tracked contact: the pilot's weapons release. */
+    bool weapons_free = false;
+
+    /** One combat step: PDC engagement, round motion, torpedo guidance, hit application. */
+    void step_combat(Real dt);
+
+    /** Fires one torpedo at the tracked contact, or does nothing without one. */
+    bool fire_torpedo();
+
+    /** Rounds or torpedoes in flight: the warp rail reads this every frame (s2.7). */
+    bool combat_active() const { return !rounds.empty() || !torpedoes.empty(); }
 
     // ---------------------------------------------------------------- docking (E9, plan 3.6)
     /** The station's ports in the zone frame, as the model exported them, in metres. */
@@ -167,6 +197,19 @@ struct World {
     /** The ship's state in the barycentric frame: the anchor's own state plus the zone offset. */
     glm::dvec2 system_position() const;
     glm::dvec2 system_velocity() const;
+
+    /**
+     * A body's state in the ZONE frame - barycentric minus the anchor - which is the frame the
+     * camera, the ship and every drawn mark live in. Plan 05's overlay and deep pass drew planets
+     * at barycentric positions into a zone-frame camera and put the whole sky a quadrant away;
+     * these two are the one conversion, named once.
+     */
+    glm::dvec2 body_zone_position(int index) const {
+        return bodies[static_cast<size_t>(index)].position - anchor.position;
+    }
+    glm::dvec2 body_zone_velocity(int index) const {
+        return bodies[static_cast<size_t>(index)].velocity - anchor.velocity;
+    }
 
     /**
      * The acceleration the ship's *frame* feels, i.e. the gravity at the ship minus the gravity at

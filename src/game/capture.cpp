@@ -58,12 +58,15 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
     // them dirty, so the pilot's own file is untouched on the way out.
     const Settings defaults;
     app.settings.camera_pitch = defaults.camera_pitch;
-    app.settings.zoom_default = defaults.zoom_default;
     app.settings.reduced_motion = defaults.reduced_motion;
     app.world.ship.assist = defaults.assist;
     app.pitch = CAMERA_PITCH_DEFAULT;
-    app.zoom = defaults.zoom_default;
-    app.zoom_current = app.zoom;
+    if (app.half_height == HOME_HALF) {
+        // No --zoom on the command line: pin the home framing so a capture never inherits the
+        // pilot's last wheel position. An explicit --zoom has already set both fields in main.
+        app.half_height = HOME_HALF;
+        app.half_height_current = app.half_height;
+    }
 
         // The plate is a state, not a separate screen: every capture leaves it revealed, and
         // `--view startup` is the one that stays. The names are the graph's, bar the two the shot
@@ -84,11 +87,17 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
             app.screen = ui::Screen::Startup;
         } else {
             const ui::Screen named = ui::screen_from_name(view);
-            // Flight is the fallback: a name the graph does not know is not the plate.
+            // Flight is the fallback: a name the graph does not know - "map" among them now, the
+            // screen plan 05 deleted - is not the plate.
             app.screen = named == ui::Screen::Startup ? ui::Screen::Flight : named;
         }
-        if (app.screen == ui::Screen::Map) {
-            app.map_target = 4;  // Halberd: the plan's own example transfer
+        if (SDL_strcmp(view, "map") == 0 && app.world.system.bodies.size() > 4) {
+            // The map view became the system-scale flight shot (plan 05 J2): Halberd framed, the
+            // same body the old almanac example transfer aimed at.
+            app.map_target = 4;
+            app.follow_body = 4;
+            app.half_height = opra::clamp_half_height(2.5 * app.world.system.bodies[4].radius);
+            app.half_height_current = app.half_height;
         }
 
 
@@ -109,44 +118,24 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
         app.camera = active_camera(app, width, height);
         // The map and the plate are built from the world as it stands after the scripted flight,
         // which is the same order the loop uses: the frame first, then the camera that frames it.
-        if (app.screen == ui::Screen::Map || app.screen == ui::Screen::Startup) {
-            app.map_frame = orrery_frame_for(app.world, app.true_scale, app.map_target);
+        if (app.screen == ui::Screen::Startup) {
+            app.map_frame = orrery_frame_for(app.world, app.map_target);
             app.camera = active_camera(app, width, height);
         }
         if (SDL_strcmp(view, "body") == 0) {
-            app.screen = ui::Screen::Map;
-            // One planet at true scale, filling the chart: the golden that holds the albedo map,
-            // the cloud deck and the night lights all in reach (plan-04 s3.4). Tessera is the one
-            // body that carries all three.
+            // One planet filling the frame: the golden that holds the albedo map, the cloud deck
+            // and the night lights in reach (plan-04 s3.4). The flight camera frames Tessera the
+            // way a double-click would (s2.1), which is how a player gets there now.
+            app.screen = ui::Screen::Flight;
             const int body = app.world.system.index_of("tessera");
-            const Body &def = app.world.system.bodies[static_cast<size_t>(body)];
-            orrery::Body mark;
-            mark.name = def.name;
-            // The chart's own origin: at the body's real position the true-scale glyph is sub-pixel
-            // against a field that reaches its orbit, so the shot centres the body itself.
-            mark.position = glm::dvec2(0.0);
-            mark.radius = def.radius;
-            // A body with no orbit of its own reads as the system's star in the orrery, and would
-            // be drawn by the star pipeline: the mark carries a circular orbit at its own radius,
-            // which classifies it a planet without pulling its real apoapsis into the field.
-            mark.elements = orbit::Elements{};
-            mark.elements.a = def.radius;
-            mark.color = orrery::ink::VELLUM;
-            mark.terrain_seed = static_cast<float>(def.terrain.seed);
-            mark.terrain_amplitude = static_cast<float>(def.terrain.amplitude);
-            // No air shell in this shot: at true scale the shell's additive glow washes the disc
-            // out (a close-range air pass needs its own tuning, plan 4.4), and the surface itself
-            // is what this golden holds.
-            mark.scale_height = 0.0f;
-            mark.atmosphere_top = 0.0f;
-            mark.albedo_map = def.albedo_map;
-            mark.cloud_map = def.cloud_map;
-            mark.night_map = def.night_map;
-            app.map_frame = orrery::Frame{};
-            app.map_frame.t = app.world.elapsed;
-            app.map_frame.true_scale = true;
-            app.map_frame.ship_position = glm::dvec2(0.0);
-            app.map_frame.bodies.push_back(mark);
+            if (body >= 0 && static_cast<size_t>(body) < app.world.system.bodies.size()) {
+                app.follow_body = body;
+                app.map_target = body;
+                const double radius = app.world.system.bodies[static_cast<size_t>(body)].radius;
+                app.half_height = opra::clamp_half_height(2.5 * radius);
+                app.half_height_current = app.half_height;
+            }
+            app.camera = active_camera(app, width, height);
         }
         // A moment of mining, so the beam and the fracture path appear in the frame.
         if (SDL_strcmp(view, "cutter") == 0) {

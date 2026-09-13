@@ -5,9 +5,9 @@
 namespace opra::ui {
 
 /**
- * The whole flow. Reading down the table is reading the game: Esc always goes back, the three
- * instruments (chart, map, manual) each open from Flight and close onto it, and the viewer closes
- * on its own key as well.
+ * The whole flow. Reading down the table is reading the game: Esc always goes back, the two
+ * instruments (chart, manual) each open from Flight and close onto it, and the viewer closes on
+ * its own key as well. There is no map screen to open: the flight view is the map (plan 05 J2).
  *
  * Two rules the tests enforce: no action appears twice for one screen, and every screen has a path
  * back to Flight. Both are easy to break by hand and impossible to break quietly here.
@@ -15,7 +15,6 @@ namespace opra::ui {
 const Transition FLOW[] = {
     // Flight. Every instrument opens here and every one of them closes onto Flight.
     {Screen::Flight, Action::Chart, Screen::Chart, false},
-    {Screen::Flight, Action::Map, Screen::Map, false},
     {Screen::Flight, Action::Manual, Screen::Manual, false},
     {Screen::Flight, Action::Pause, Screen::Pause, false},
     {Screen::Flight, Action::ModelViewer, Screen::Viewer, false},
@@ -23,8 +22,6 @@ const Transition FLOW[] = {
     // The instruments close on Esc and on their own key.
     {Screen::Chart, Action::Pause, Screen::Flight, false},
     {Screen::Chart, Action::Chart, Screen::Flight, false},
-    {Screen::Map, Action::Pause, Screen::Flight, false},
-    {Screen::Map, Action::Map, Screen::Flight, false},
     {Screen::Manual, Action::Pause, Screen::Flight, false},
     {Screen::Manual, Action::Manual, Screen::Flight, false},
     {Screen::Viewer, Action::Pause, Screen::Flight, false},
@@ -60,7 +57,6 @@ const char *screen_name(Screen screen) {
         case Screen::Startup: return "startup";
         case Screen::Flight: return "flight";
         case Screen::Chart: return "chart";
-        case Screen::Map: return "map";
         case Screen::Manual: return "manual";
         case Screen::Pause: return "pause";
         case Screen::Settings: return "settings";
@@ -71,7 +67,7 @@ const char *screen_name(Screen screen) {
 
 Screen screen_from_name(const char *name) {
     for (Screen screen :
-         {Screen::Startup, Screen::Flight, Screen::Chart, Screen::Map, Screen::Manual, Screen::Pause,
+         {Screen::Startup, Screen::Flight, Screen::Chart, Screen::Manual, Screen::Pause,
           Screen::Settings, Screen::Viewer}) {
         if (std::strcmp(screen_name(screen), name) == 0) return screen;
     }

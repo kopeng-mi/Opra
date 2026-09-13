@@ -13,10 +13,12 @@
 namespace opra::ui {
 
 /**
- * The screens. `Hangar` is not here yet: the plan lists it for the refit work, and a row for a
- * screen that cannot be reached is exactly what the reachability assert exists to catch.
+ * The screens. There is no Map here: plan 05 J2 replaced it with one continuous zoom, so the
+ * system is what the flight view shows when the wheel runs out. `Hangar` is not here yet: the
+ * plan lists it for the refit work, and a row for a screen that cannot be reached is exactly what
+ * the reachability assert exists to catch.
  */
-enum class Screen { Startup, Flight, Chart, Map, Manual, Pause, Settings, Viewer };
+enum class Screen { Startup, Flight, Chart, Manual, Pause, Settings, Viewer };
 
 /**
  * One key-driven edge. `on` is the action that takes you from `from` to `to`; `pushes` means `to`

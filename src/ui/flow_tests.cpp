@@ -13,8 +13,8 @@ using ui::MenuAction;
 using ui::Screen;
 using selftest::check;
 
-const Screen kScreens[] = {Screen::Startup, Screen::Flight,  Screen::Chart,   Screen::Map,
-                           Screen::Manual,  Screen::Pause,   Screen::Settings, Screen::Viewer};
+const Screen kScreens[] = {Screen::Startup, Screen::Flight, Screen::Chart,
+                           Screen::Manual,  Screen::Pause,  Screen::Settings, Screen::Viewer};
 
 /** Every screen one edge, from either table, leads to from `from`. */
 std::vector<Screen> neighbours(Screen from) {

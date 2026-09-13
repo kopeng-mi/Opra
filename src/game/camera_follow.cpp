@@ -1,6 +1,10 @@
 #include "game/camera_follow.h"
 
 #include <algorithm>
+#include <cmath>
+
+#include "game/config.h"
+#include "render/camera.h"
 
 namespace opra {
 namespace {
@@ -39,13 +43,39 @@ void follow_snap(FollowState &state, const glm::dvec2 &ship, const glm::dvec2 &s
     state.velocity = ship_velocity;
 }
 
-void look_step(glm::dvec2 &pan, const glm::dvec2 &anchor_world, const glm::dvec2 &cursor_world) {
-    pan += anchor_world - cursor_world;
+glm::dvec2 look_cone_clamp(const glm::dvec2 &cone) {
+    // The cone (J1): thirty degrees from home in *any* direction, so the clamp is on the magnitude
+    // of the two-axis offset, not on each axis alone - a diagonal look reaches thirty degrees too.
+    const double limit = config::LOOK_CONE_DEG * 3.14159265358979323846 / 180.0;
+    const double angle = glm::length(cone);
+    if (angle <= limit || angle <= 0.0) return cone;
+    return cone * (limit / angle);
 }
 
-glm::dvec2 pan_release(const glm::dvec2 &pan, Real dt, double tau) {
+void look_cone_step(glm::dvec2 &cone, double anchor_x, double anchor_y, double cursor_x,
+                    double cursor_y, double height) {
+    if (!(height > 0.0)) return;
+    // Drag to angle: the same scale at every zoom, because the cone is a degree of freedom about
+    // the home axis and not a measure of world space (J1).
+    const glm::dvec2 drag(cursor_x - anchor_x, cursor_y - anchor_y);
+    cone = look_cone_clamp(drag * (config::LOOK_RADIANS_PER_PIXEL * 900.0 / height));
+}
+
+glm::dvec2 look_cone_release(const glm::dvec2 &cone, Real dt, double tau) {
     if (tau <= 0.0) return glm::dvec2(0.0);
-    return pan * std::exp(-static_cast<double>(dt) / tau);
+    return cone * std::exp(-static_cast<double>(dt) / tau);
+}
+
+glm::vec3 look_eye(double half_height, float pitch, const glm::dvec2 &cone) {
+    // The home orbit, swung: elevation first (the cone's y leans the orbit up or down, clamped so
+    // the camera's own limits hold), then azimuth about world up. North stays screen-up because
+    // the cone never rolls and never crosses the pole - the up vector is always +Y.
+    constexpr float DEG = 3.14159265358979323846f / 180.0f;
+    const float elevation = glm::clamp(pitch + static_cast<float>(cone.y), 8.0f * DEG, 88.0f * DEG);
+    const glm::vec3 home = orbit_eye(half_height, elevation);
+    const float azimuth = static_cast<float>(cone.x);
+    const float c = std::cos(azimuth), s = std::sin(azimuth);
+    return {home.x * c - home.y * s, home.x * s + home.y * c, home.z};
 }
 
 glm::dvec2 follow_step(FollowState &state, const glm::dvec2 &ship, const glm::dvec2 &ship_velocity,

@@ -48,4 +48,11 @@ std::vector<std::string> update_satellites(World &world);
 /** True when the elements are inside the box the contract names, within tolerance. */
 bool inside_box(const orbit::Elements &elements, double box_a, double box_e);
 
+/** The system's discoveries, deterministic in the bodies' own seeds. The Discovery type itself
+ *  lives in sim/world.h - it is run state the overlay and the HUD both read. */
+std::vector<World::Discovery> generate_discoveries(const SystemDef &system);
+
+/** A longitude the survey just covered: any unfound discovery under the arc is found for good. */
+void note_scan_theta(World &world, int body, double theta);
+
 }  // namespace opra

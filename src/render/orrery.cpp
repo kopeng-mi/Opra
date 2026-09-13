@@ -36,8 +36,9 @@ Meshes add_meshes(MeshLibrary &library) {
     out.rock = library.get("orrery.rock", []() { return meshes::icosahedron(1.0f, 0); });
     out.ship = library.get("orrery.ship", []() { return meshes::cone(1.0f, 2.0f, 12); });
     // The bodies draw with a sphere dense enough for a shader to shade: 5120 triangles, which is
-    // the LOD the plan's sphere_lod1 asks for and nothing like the chart's glyph.
-    out.planet = library.get("orrery.planet", []() { return meshes::icosahedron(1.0f, 4); });
+    // the LOD the plan's sphere_lod1 asks for and nothing like the chart's glyph. The key matches
+    // ModelSet's, so the flight view's deep pass and the chart share one mesh.
+    out.planet = library.get("planet", []() { return meshes::icosahedron(1.0f, 4); });
     return out;
 }
 
@@ -228,7 +229,8 @@ Camera map_camera(const Frame &frame, float width, float height, float centre_x)
     camera.aspect = height > 0.0f ? width / height : 1.0f;
     // Move the camera right and the drawing slides left: a positive shift centres the field in a
     // pane left of the screen's middle, which is where the almanac leaves room for it.
-    const float shift = 2.0f * (0.5f - centre_x) * camera.half_height * camera.aspect;
+    const float shift =
+        static_cast<float>(2.0 * (0.5 - centre_x) * camera.half_height) * camera.aspect;
     camera.target = glm::vec3(shift, 0.0f, 0.0f);
     camera.eye = camera.target + orbit_eye(camera.half_height, MAP_PITCH);
     return camera;

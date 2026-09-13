@@ -120,6 +120,30 @@ struct HudFrame {
     /** No HUD mark reads right with a dead hull: the banner replaces the centre readouts. */
     bool wrecked = false;
 
+    // ---- plan 05 s4.3: the readout maths, computed in the game layer, printed by the HUD
+    double verticalSpeed = 0.0;    // (r . v)/|r| - closing on the primary is negative
+    double horizontalSpeed = 0.0;  // sqrt(|v|^2 - v_vert^2)
+    double massTonnes = 0.0;       // wet mass
+    double twr = 0.0;              // thrust / (mass . g); NaN prints as the plan's dash
+    bool twrValid = false;
+    double deltaV = 0.0;           // Isp . g0 . ln(m_wet/m_dry); 0 when the tanks are empty
+    double burnSeconds = 0.0;      // dv . m / thrust, ship time
+    double closingRate = 0.0;      // -(r_rel . v_rel)/|r_rel| to the tracked contact
+    bool targetValid = false;
+    const char *targetName = "";
+    double targetRange = 0.0;
+    /** The warp rail's suggestion (s2.7), shown on the time block, never applied silently. */
+    double warpSuggest = 1.0;
+    /** The first planned node, when one exists: the NODE block reads these. */
+    bool nodeValid = false;
+    double nodeDeltaV = 0.0;
+    double nodeBurnSeconds = 0.0;
+    double nodeTMinus = 0.0;
+    /** Incoming fire (s4.5, s5): forces WEAPONS and the threat block on at any density. */
+    bool underFire = false;
+    /** The ship's own throttle, 0..1, for the bottom strip's bar. */
+    float throttle = 0.0f;
+
     // Centre: the one contextual line.
     const char *context = nullptr;
     glm::vec4 contextColor{1.0f, 1.0f, 1.0f, 1.0f};

@@ -42,13 +42,10 @@ SettingsResult build_settings(Context &ui, const Rect &screen, Settings &setting
     ui.section(ui.cut_top(26.0f), "view");
     ui.cut_top(8.0f);
 
-    float zoom = settings.zoom_default;
-    if (ui.slider("set.zoom", ui.cut_top(38.0f), "default zoom  (0 key)", zoom, 0.6f, 3.0f)) {
-        settings.zoom_default = zoom;
-        result.changed = true;
-    }
     // F1: the orbit pitch is a framing choice read once at launch, not a flight control. It lives
-    // here so the one thing the camera does not do during flight can still be set.
+    // here so the one thing the camera does not do during flight can still be set. The default
+    // zoom is not a setting any more: the home framing is a design constant now that one wheel
+    // runs from hull to system scale (plan 05 J2).
     float pitch = settings.camera_pitch;
     if (ui.slider("set.pitch", ui.cut_top(38.0f), "camera pitch  (degrees)", pitch, 17.0f, 88.0f)) {
         settings.camera_pitch = pitch;

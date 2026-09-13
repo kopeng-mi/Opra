@@ -6,11 +6,11 @@
 namespace opra {
 
 struct Settings {
-    /** Where the 0 key and a fresh run put the camera. */
-    float zoom_default = config::ZOOM_DEFAULT;
     /**
      * The camera's orbit pitch in degrees, read once and fixed during flight (F1): pitch is a
-     * framing choice, not a control. The model viewer keeps its own turntable.
+     * framing choice, not a control. The model viewer keeps its own turntable. The default framing
+     * itself is not a setting any more: the home half-height is a design constant (render/camera.h)
+     * now that one wheel runs from hull to system scale (plan 05 J2).
      */
     float camera_pitch = 32.0f;
     /** Attitude assist on at the start of a run. */

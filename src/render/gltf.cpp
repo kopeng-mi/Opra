@@ -222,8 +222,10 @@ void walk(const cgltf_data *data, const cgltf_node *node, const glm::mat4 &paren
             part.effect = effect;
             // Effect meshes are authored with a three.js ShaderMaterial, which glTF cannot carry, so
             // they arrive unlit white. The additive pass expects the legacy flame tint instead, and
-            // the mesh's own material is never read there: the flame pass is emissive.
-            part.color = effect ? glm::vec3(0.639f, 0.914f, 1.0f) : glm::vec3(1.0f);
+            // the mesh's own material is never read there: the flame pass is emissive - genuinely
+            // HDR, ~1.6 at the core, so the bloom chain's tightest mip carries it and the widest
+            // mips do not (plan 05 S-1: a halo, not a wash).
+            part.color = effect ? glm::vec3(0.99f, 1.42f, 1.55f) : glm::vec3(1.0f);
 
             if (matrix_is_trs(matrix)) {
                 glm::vec3 scale(1.0f), translation(1.0f), skew(0.0f);

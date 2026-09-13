@@ -101,8 +101,9 @@ int main(int argc, char **argv) {
 
     opra::App app;
     if (options.zoom > 0.0f) {
-        app.zoom = std::clamp(options.zoom, opra::config::ZOOM_MIN, opra::config::ZOOM_MAX);
-        app.zoom_current = app.zoom;
+        // --zoom is a multiple of the home framing: 1 is the 150 m flight shot (plan 05 s3.1).
+        app.half_height = opra::clamp_half_height(opra::HOME_HALF * options.zoom);
+        app.half_height_current = app.half_height;
     }
     // A tape draws offscreen and reads its frames back, so its window is never shown.
     app.init(options.hidden || options.tape != nullptr, options.debug_gpu);

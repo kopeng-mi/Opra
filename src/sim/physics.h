@@ -33,6 +33,13 @@ struct ShipSpec {
     Real cooling;
     Real scanScale;
     Real collectScale;
+    /**
+     * Lateral authority as a fraction of main thrust (plan 05 s5.1): close quarters is won with
+     * the RCS, so the fraction is a derived value - the component library's RCS blocks decide it
+     * (s6.2's derivation fills it in derive_spec), and the stock table carries the figures the
+     * derivation lands on.
+     */
+    Real strafeFraction = 0.22;
 };
 
 extern const ShipSpec SHIPS[3];
@@ -78,6 +85,13 @@ struct ShipState {
      * exporter's jet positions in the sidecar, the same way the collider shapes arrive.
      */
     Real rcsJet[4] = {0, 0, 0, 0};
+    /**
+     * Per-component damage (plan 05 s5.4): the fraction of main thrust a drive-pod hit has cost
+     * (0..1), and the propellant a tank hit is venting, kilograms per second. `apply_ship_damage`
+     * writes both; step_ship reads them - the derivation's component model paying for itself.
+     */
+    Real thrustDamage = 0;
+    Real fuelLeak = 0;
     /** Seconds since the last hull-damaging contact. */
     Real contactTimer = 1;
 };

@@ -321,7 +321,8 @@ void test_map_camera() {
     // A plan view: the eye sits one R above the target, R = half_height / tan(12 degrees), and the
     // half degree off the pole only tips it sideways by 0.0087 R.
     const glm::vec3 offset = camera.eye - camera.target;
-    const float radius = camera.half_height / std::tan(CAMERA_FOV_Y * 0.5f);
+    const float radius = static_cast<float>(static_cast<double>(camera.half_height) /
+                                             std::tan(static_cast<double>(CAMERA_FOV_Y) * 0.5));
     check(static_cast<double>(offset.z) > static_cast<double>(radius) * 0.9999,
           "camera: the eye is one R above the plane");
     check(std::fabs(offset.y) < radius * 0.01f, "camera: the eye is within a degree of the pole");

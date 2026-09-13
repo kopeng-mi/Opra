@@ -6,11 +6,24 @@
 
 namespace opra {
 
-glm::vec3 orbit_eye(float half_height, float pitch) {
+double Camera::eye_distance() const {
+    return half_height / std::tan(static_cast<double>(CAMERA_FOV_Y) * 0.5);
+}
+
+float Camera::near_z() const {
+    // s2.2: both planes ride the eye distance, so the near/far ratio is 1e6 at every scale and
+    // reversed-Z has the same precision zoomed onto a hull as zoomed out to the system.
+    return static_cast<float>(eye_distance() * 1.0e-3);
+}
+
+float Camera::far_z() const { return static_cast<float>(eye_distance() * 1.0e3); }
+
+glm::vec3 orbit_eye(double half_height, float pitch) {
     // The distance that makes `half_height` the half-height of the view *at the target*: everything
     // the HUD scales by hand (screen pixels per metre) is measured at that plane.
-    const float radius = half_height / std::tan(CAMERA_FOV_Y * 0.5f);
-    return {0.0f, -std::cos(pitch) * radius, std::sin(pitch) * radius};
+    const double radius = half_height / std::tan(static_cast<double>(CAMERA_FOV_Y) * 0.5);
+    return {0.0f, static_cast<float>(-std::cos(static_cast<double>(pitch)) * radius),
+            static_cast<float>(std::sin(static_cast<double>(pitch)) * radius)};
 }
 
 bool ViewFrustum::contains(const glm::vec3 &at, float radius) const {
@@ -35,6 +48,8 @@ ViewFrustum view_frustum(const Camera &camera, float margin) {
     frustum.up = glm::cross(frustum.right, frustum.forward);
     frustum.tan_y = std::tan(CAMERA_FOV_Y * 0.5f);
     frustum.tan_x = frustum.tan_y * camera.aspect;
+    frustum.near_z = camera.near_z();
+    frustum.far_z = camera.far_z();
     frustum.margin = margin;
     return frustum;
 }
@@ -64,9 +79,11 @@ glm::mat4 view_projection(const Camera &camera) {
     // at every other pitch +Y is the axis that keeps world north pointing up the screen.
     const glm::mat4 view = glm::lookAt(camera.eye, camera.target, glm::vec3(0.0f, 1.0f, 0.0f));
     // Reversed-Z: near maps to 1 and far to 0, so the depth target is cleared to 0 and the mesh
-    // pipeline compares GREATER. A conventional projection over a 1 m .. 12 km range spends its
-    // resolution where nothing is drawn and loses the hull to z-fighting.
-    const glm::mat4 proj = glm::perspectiveZO(CAMERA_FOV_Y, camera.aspect, CAMERA_FAR, CAMERA_NEAR);
+    // pipeline compares GREATER. Both planes are derived from the eye distance (s2.2), so the
+    // depth ratio - and therefore reversed-Z's precision - is the same at every zoom.
+    const float near_z = camera.near_z();
+    const float far_z = camera.far_z();
+    const glm::mat4 proj = glm::perspectiveZO(CAMERA_FOV_Y, camera.aspect, far_z, near_z);
     return proj * view;
 }
 
