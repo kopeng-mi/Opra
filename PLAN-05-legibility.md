@@ -1,4 +1,4 @@
-# Opra — plan 05: continuous scale, legibility, close quarters
+> **Status: complete.** The live plans are [PLAN-06-instrument.md](PLAN-06-instrument.md) (flow, HUD, screens, sky) and [PLAN-07-shipkit.md](PLAN-07-shipkit.md) (spines, parts, assembly, wreckage).
 
 Live plan. Plans [01](PLAN.md), [02](PLAN-02-system.md), [03](PLAN-03-worlds.md) and
 [04](PLAN-04-assets.md) are complete; their decisions bind except where reversed below.

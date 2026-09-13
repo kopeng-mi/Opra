@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "sim/component.h"
 #include "sim/world.h"
 #include "ui/tokens.h"
 
@@ -338,5 +339,113 @@ Effects &world_effects() {
 }
 
 void clear_effects() { world_effects().clear(); }
+
+WreckageResult emit_wreckage(Effects &pool, const ShipDesign &design, const PartTable &parts,
+                             const Vec2 &ship_pos, const Vec2 &ship_vel, Real ship_angle,
+                             Real ship_omega, Real blast_energy, Real born,
+                             Real station_bounds_radius) {
+    WreckageResult result;
+    if (design.placements.empty()) return result;
+
+    const Vec2 com_local = centre_of_mass(design, parts);
+    Real m_total = 0.0;
+    for (const auto &p : design.placements) {
+        auto it = parts.find(p.part);
+        if (it != parts.end()) m_total += it->second.dry_mass;
+    }
+    if (m_total <= 0.0) m_total = 1000.0;
+
+    const Real cos_a = std::cos(ship_angle);
+    const Real sin_a = std::sin(ship_angle);
+
+    // Speed formula from §11:
+    // s = clamp(0.6 · sqrt(E_blast / m_total), 4, 60) m/s
+    const Real eff_energy = blast_energy > 0.0 ? blast_energy : 1.0e8;
+    const Real s = std::clamp(0.6 * std::sqrt(eff_energy / m_total), 4.0, 60.0);
+
+    // 1. Central puff: 24 grains
+    constexpr int kCentralPuff = 24;
+    for (int i = 0; i < kCentralPuff; ++i) {
+        const Real a = 6.2831853f * hash01(static_cast<std::uint32_t>(i * 3 + 1));
+        const Real speed = 10.0 + 30.0 * hash01(static_cast<std::uint32_t>(i * 7 + 2));
+        Effect grain;
+        grain.kind = EffectKind::Dust;
+        grain.origin = {ship_pos.x + std::cos(a) * 2.0, ship_pos.y + std::sin(a) * 2.0};
+        grain.dir = {std::cos(a), std::sin(a)};
+        grain.speed = speed;
+        grain.size = 2.0 + 2.0 * hash01(static_cast<std::uint32_t>(i * 5 + 3));
+        grain.born = born;
+        grain.duration = fx::BLAST_SECONDS;
+        grain.strength = fx::DUST_STRENGTH;
+        grain.spin = (hash01(static_cast<std::uint32_t>(i * 11 + 4)) * 2.0 - 1.0) * 3.0;
+        grain.phase = a;
+        if (pool.spawn(grain)) ++result.particles;
+    }
+
+    // 2. For each surviving placement:
+    for (std::size_t i = 0; i < design.placements.size(); ++i) {
+        const Placement &p = design.placements[i];
+        if (p.destroyed) continue;
+
+        const Real part_r = 2.5;
+        const Real L = static_cast<Real>(design.spine.slots) * design.spine.pitch;
+        const Real centre_y = L * 0.5 - (static_cast<Real>(p.slot) + 0.5 * static_cast<Real>(p.span)) * design.spine.pitch;
+        Real pos_x_local = 0.0;
+        if (!is_axial(p.facing)) {
+            pos_x_local = face_dir(p.facing).x * (design.spine.half_width - design.spine.recess);
+        }
+
+        const Vec2 r_local{pos_x_local - com_local.x, centre_y - com_local.y};
+        const Vec2 r{r_local.x * cos_a - r_local.y * sin_a,
+                     r_local.x * sin_a + r_local.y * cos_a};
+
+        const Vec2 pos_part = {ship_pos.x + r_local.x * cos_a - r_local.y * sin_a,
+                               ship_pos.y + r_local.x * sin_a + r_local.y * cos_a};
+
+        const Real r_len = std::hypot(r.x, r.y);
+        Vec2 n_hat{1.0, 0.0};
+        if (r_len >= 0.1) {
+            n_hat = {r.x / r_len, r.y / r_len};
+        }
+
+        const Vec2 tang{-ship_omega * r.y, ship_omega * r.x};
+        const Vec2 v_sep{ship_vel.x + tang.x + n_hat.x * s,
+                         ship_vel.y + tang.y + n_hat.y * s};
+
+        const Real omega = ship_omega + (hash01(static_cast<std::uint32_t>(i)) * 2.0 - 1.0) * 1.5;
+
+        const Real total_offset = part_r + station_bounds_radius;
+        const Vec2 spawn = {pos_part.x + n_hat.x * total_offset,
+                            pos_part.y + n_hat.y * total_offset};
+
+        DebrisBody db;
+        db.part = p.part;
+        db.pos = spawn;
+        db.vel = v_sep;
+        db.angle = ship_angle;
+        db.angular_vel = omega;
+        db.bounds_radius = part_r;
+        result.debris.push_back(db);
+
+        // 4 grains per part
+        for (int g = 0; g < 4; ++g) {
+            const Real ga = 6.2831853f * hash01(static_cast<std::uint32_t>(i * 4 + g + 10));
+            Effect pgrain;
+            pgrain.kind = EffectKind::Trail;
+            pgrain.origin = pos_part;
+            pgrain.dir = {std::cos(ga), std::sin(ga)};
+            pgrain.speed = std::hypot(v_sep.x, v_sep.y) * 0.5 + 5.0;
+            pgrain.size = 1.5;
+            pgrain.born = born;
+            pgrain.duration = fx::TRAIL_SECONDS;
+            pgrain.strength = fx::TRAIL_STRENGTH;
+            pgrain.spin = (hash01(static_cast<std::uint32_t>(i * 4 + g + 50)) * 2.0 - 1.0) * 2.0;
+            pgrain.phase = ga;
+            if (pool.spawn(pgrain)) ++result.particles;
+        }
+    }
+
+    return result;
+}
 
 }  // namespace opra

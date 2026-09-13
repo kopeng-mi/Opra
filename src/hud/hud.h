@@ -55,6 +55,19 @@ std::string distance_readout(double metres);
 std::string clock_readout(double seconds);
 std::string speed_readout(double metres_per_second);
 
+/** Deterministic wrap to (-180, 180] per plan 06 §3.2. Boundary maps to +180. */
+double wrap180(double deg);
+
+struct ArcMark {
+    bool live = false;
+    bool on_tape = false;
+    float phi = 0.0f;
+    bool clamped = false;
+    bool pointing_right = false;
+};
+
+ArcMark calculate_arc_mark(double bearing_deg, double nose_deg, float phi_max);
+
 /** Plan 4.6's orbit block: the conic's own figures, copied out of the world by game/scene.cpp. */
 struct OrbitFrame {
     bool valid = false;
@@ -217,6 +230,15 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame);
 float orbit_block_height(const HudFrame &frame);
 /** Draws the orbit block inside `at`, which the block layouter placed. */
 void build_orbit_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at);
+
+float vessel_block_height(const HudFrame &frame);
+void build_vessel_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at);
+float weapons_block_height(const HudFrame &frame);
+void build_weapons_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at);
+float node_block_height(const HudFrame &frame);
+void build_node_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at);
+float threat_block_height(const HudFrame &frame);
+void build_threat_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at);
 
 /** True when the panel draws every gate term rather than only the failing ones (F10, blocks.cpp). */
 bool program_full_gates(const HudFrame &frame);

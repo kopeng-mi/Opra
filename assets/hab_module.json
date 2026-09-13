@@ -3,106 +3,114 @@
   "scale": 1,
   "aabb": {
     "min": [
-      -1.3552,
-      -2.15,
-      -1.41
+      -17.5207,
+      -15.7207,
+      -13.2006
     ],
     "max": [
-      1.3552,
-      2.15,
-      1.72
+      17.5207,
+      17.7207,
+      16.0606
     ]
   },
   "aabbWithEffects": {
     "min": [
-      -1.3552,
-      -2.15,
-      -1.41
+      -17.5207,
+      -15.7207,
+      -13.2006
     ],
     "max": [
-      1.3552,
-      2.15,
-      1.72
+      17.5207,
+      17.7207,
+      16.0606
     ]
   },
   "collider": {
-    "halfLength": 2.15,
-    "halfWidth": 1.355,
+    "halfLength": 16.721,
+    "halfWidth": 17.521,
     "shapes": [
       {
-        "kind": "box",
+        "kind": "circle",
+        "pos": [
+          -0.8,
+          1
+        ],
+        "radius": 16.7207
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0.8,
+          1
+        ],
+        "radius": 16.7207
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          -0.8,
+          1
+        ],
+        "radius": 9.1959
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0.8,
+          1
+        ],
+        "radius": 9.1959
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          -1.2
+        ],
+        "radius": 8.3604
+      },
+      {
+        "kind": "circle",
         "pos": [
           0,
           0
         ],
-        "angle": 0,
-        "half": [
-          1.25,
-          2.14
-        ]
+        "radius": 8.3604
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          1.2
+        ],
+        "radius": 8.3604
       },
       {
         "kind": "box",
         "pos": [
-          0,
+          -0.42,
           0.2
         ],
         "angle": 0,
         "half": [
-          0.55,
-          0.75
+          9.7537,
+          5.8523
         ]
       },
       {
         "kind": "box",
         "pos": [
-          0,
+          0.42,
           0.2
         ],
         "angle": 0,
         "half": [
-          0.425,
-          0.6
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          0,
-          0.75
-        ],
-        "angle": 0,
-        "half": [
-          1.28,
-          0.17
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          0,
-          -1.35
-        ],
-        "angle": 0,
-        "half": [
-          1.31,
-          0.11
-        ]
-      },
-      {
-        "kind": "box",
-        "pos": [
-          0,
-          1.35
-        ],
-        "angle": 0,
-        "half": [
-          1.31,
-          0.11
+          9.7537,
+          5.8523
         ]
       }
     ],
-    "bounds_radius": 2.6647
+    "bounds_radius": 24.9199
   },
   "ports": [],
   "effects": [],
@@ -120,7 +128,7 @@
   "stats": {},
   "counts": {
     "meshes": 8,
-    "vertices": 9816,
-    "triangles": 3272
+    "vertices": 5448,
+    "triangles": 1816
   }
 }

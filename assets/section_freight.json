@@ -1,0 +1,128 @@
+{
+  "name": "section_freight",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -3.175,
+      -0.3251,
+      -1.7
+    ],
+    "max": [
+      3.175,
+      4.15,
+      1.7678
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -3.175,
+      -0.3251,
+      -1.7
+    ],
+    "max": [
+      3.175,
+      4.15,
+      1.7678
+    ]
+  },
+  "collider": {
+    "halfLength": 2.238,
+    "halfWidth": 3.175,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          1.3,
+          2
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          0.95,
+          1.75
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -2.45,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          0.65,
+          1.75
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          2.45,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          0.65,
+          1.75
+        ]
+      }
+    ],
+    "bounds_radius": 5.0295
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "section_freight_normal",
+      "roughness": "section_freight_roughness",
+      "albedo": "section_freight_albedo"
+    },
+    "materials": 5
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 6,
+    "vertices": 1536,
+    "triangles": 512
+  },
+  "part": {
+    "kind": "section_cargo",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 12600,
+    "propellant": 0,
+    "thrust": 0,
+    "cooling": 0,
+    "heat_capacity": 12,
+    "rcs_jets": 0,
+    "rcs_authority": 0,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

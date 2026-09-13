@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cmath>
 
+#include "ui/tokens.h"
+#include "ui/ui.h"
+
 namespace opra::ui {
 
 glm::vec4 with_alpha(const glm::vec4 &color, float alpha) {
@@ -90,6 +93,37 @@ void push_text(UIBatch &batch, const char *text, float px, const glm::vec2 &at, 
     draw.face = face;
     draw.color = color;
     batch.texts.push_back(std::move(draw));
+}
+
+void draw_meter(UIBatch &batch, const Rect &at, float value, float threshold,
+                const glm::vec4 &ink) {
+    constexpr int kSegments = 8;
+    constexpr float kGap = 2.0f;
+    const float total_gap = kGap * (kSegments - 1);
+    const float seg_w = (at.w - total_gap) / static_cast<float>(kSegments);
+    const float clamped_val = clamp01(value);
+
+    for (int i = 0; i < kSegments; ++i) {
+        const float seg_x = at.x + static_cast<float>(i) * (seg_w + kGap);
+        const float seg_min = static_cast<float>(i) / static_cast<float>(kSegments);
+        const float seg_max = static_cast<float>(i + 1) / static_cast<float>(kSegments);
+
+        // Dim background slot
+        push_rect(batch, {seg_x, at.y}, {seg_w, at.h}, with_alpha(ink, 0.15f));
+
+        if (clamped_val >= seg_max) {
+            push_rect(batch, {seg_x, at.y}, {seg_w, at.h}, ink);
+        } else if (clamped_val > seg_min) {
+            const float frac = (clamped_val - seg_min) / (seg_max - seg_min);
+            push_rect(batch, {seg_x, at.y}, {seg_w * frac, at.h}, ink);
+        }
+    }
+
+    if (threshold > 0.0f && threshold <= 1.0f) {
+        const float tick_x = at.x + threshold * at.w;
+        push_rect(batch, {tick_x - 0.5f, at.y - 2.0f}, {1.0f, at.h + 4.0f},
+                  with_alpha(tokens::ETCH, 0.85f));
+    }
 }
 
 }  // namespace opra::ui

@@ -8,10 +8,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include <glm/glm.hpp>
 
 #include "core/units.h"
+#include "sim/component.h"
 
 namespace opra {
 
@@ -83,7 +85,7 @@ inline constexpr Real PULSE_SIZE = 1.8;
 
 /** 96 slots hold a 16-spark burst over a 27-particle blast, twice inside one 0.8 s life. */
 inline constexpr int POOL_SLOTS = 96;
-inline constexpr int POOL_MAX = 192;
+inline constexpr int POOL_MAX = 256;
 
 /** Bodies are identified by id, handed out in creation order, so 4096 flags are the set of
  *  everything this module has already seen leave the field. Field rocks are far below the bound;
@@ -223,6 +225,28 @@ int emit_impact(Effects &pool, const Vec2 &point, const Vec2 &normal, Real speed
 int emit_blast(Effects &pool, const Vec2 &centre, Real rock_radius, Real born);
 int emit_trail(Effects &pool, const Vec2 &from, const Vec2 &velocity, Real radius, Real born);
 int emit_dock_pulse(Effects &pool, const Vec2 &centre, Real born);
+
+/** A piece of wreckage from a detached module (PLAN-08 §11). */
+struct DebrisBody {
+    std::string part;
+    Vec2 pos{0.0, 0.0};
+    Vec2 vel{0.0, 0.0};
+    Real angle = 0.0;
+    Real angular_vel = 0.0;
+    Real bounds_radius = 2.5;
+    bool retired = false;
+};
+
+struct WreckageResult {
+    std::vector<DebrisBody> debris;
+    int particles = 0;
+};
+
+/** Module wreckage separation on ship destruction (PLAN-08 §11). */
+WreckageResult emit_wreckage(Effects &pool, const ShipDesign &design, const PartTable &parts,
+                             const Vec2 &ship_pos, const Vec2 &ship_vel, Real ship_angle,
+                             Real ship_omega, Real blast_energy, Real born,
+                             Real station_bounds_radius = 0.0);
 
 /**
  * The process's one pool. The game runs one world in one window, and the pool is keyed to the sim

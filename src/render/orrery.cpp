@@ -219,20 +219,22 @@ void build(SceneBuilder &scene, const Meshes &meshes, const Frame &frame) {
     }
 }
 
-Camera map_camera(const Frame &frame, float width, float height, float centre_x) {
+Camera map_camera(const Frame &frame, float width, float height, float centre_x,
+                  float zoom, float pitch, float yaw, const glm::dvec2 &center_offset) {
     Camera camera;
-    // The chart's own origin is the render origin: this is the one camera whose world positions are
-    // already small, so nothing has to be subtracted before the float cast.
     camera.origin = glm::dvec3(0.0);
     const double field = field_radius(frame);
-    camera.half_height = static_cast<float>(field / metres_per_unit(field)) * FIELD_MARGIN;
+    camera.half_height = static_cast<float>(field / metres_per_unit(field)) * FIELD_MARGIN / std::max(0.01f, zoom);
     camera.aspect = height > 0.0f ? width / height : 1.0f;
-    // Move the camera right and the drawing slides left: a positive shift centres the field in a
-    // pane left of the screen's middle, which is where the almanac leaves room for it.
     const float shift =
         static_cast<float>(2.0 * (0.5 - centre_x) * camera.half_height) * camera.aspect;
-    camera.target = glm::vec3(shift, 0.0f, 0.0f);
-    camera.eye = camera.target + orbit_eye(camera.half_height, MAP_PITCH);
+    camera.target = glm::vec3(shift + static_cast<float>(center_offset.x),
+                              static_cast<float>(center_offset.y), 0.0f);
+    const glm::vec3 base_eye = orbit_eye(camera.half_height, pitch);
+    const float c = std::cos(yaw), s = std::sin(yaw);
+    camera.eye = camera.target + glm::vec3(base_eye.x * c - base_eye.y * s,
+                                           base_eye.x * s + base_eye.y * c,
+                                           base_eye.z);
     return camera;
 }
 

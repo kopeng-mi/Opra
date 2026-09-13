@@ -1,0 +1,16 @@
+{
+  "name": "opra-yard",
+  "private": true,
+  "type": "module",
+  "description": "Scratch workbench for authoring the spine/part kit. Nothing here ships; parts graduate to tools/models/ once they pass audit.",
+  "scripts": {
+    "audit": "bun run audit.mjs",
+    "sheet": "bun run sheet.mjs"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  }
+}

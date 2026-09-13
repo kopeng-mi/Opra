@@ -224,8 +224,10 @@ void build(SceneBuilder &scene, const Meshes &meshes, const Frame &frame);
 /**
  * The chart's camera: a plan view of the field, framed so the system lands in a pane whose centre is
  * `centre_x` of the screen width (the almanac takes the right), with a pitch half a degree off the
- * pole so the view basis stays defined.
+ * pole so the view basis stays defined (plan 06 §4.1).
  */
-Camera map_camera(const Frame &frame, float width, float height, float centre_x = 0.5f);
+Camera map_camera(const Frame &frame, float width, float height, float centre_x = 0.5f,
+                  float zoom = 1.0f, float pitch = MAP_PITCH, float yaw = 0.0f,
+                  const glm::dvec2 &center_offset = glm::dvec2(0.0));
 
 }  // namespace opra::orrery

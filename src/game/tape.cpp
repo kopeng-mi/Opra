@@ -228,7 +228,7 @@ Seen read_state(const App &app, const glm::dvec2 &start, const Checkpoint &point
     Seen seen;
     seen.name = point.name;
     seen.at = point.at;
-    seen.screen = ui::screen_name(app.screen);
+    seen.screen = ui::screen_name(app.current());
     seen.speed = length(app.world.ship.velocity);
     seen.distance = glm::length(glm::dvec2(app.world.ship.position.x, app.world.ship.position.y) -
                                 start);
@@ -322,7 +322,7 @@ std::string describe(const Seen &seen) {
  * the sim's fixed rate - is exactly what run_loop does.
  */
 void step(App &app) {
-    if (app.screen != ui::Screen::Flight) return;
+    if (app.current() != ui::Screen::Flight) return;
     const FlightInput flight = flight_input_from(app.input);
     const bool thrusting = flight.thrust != 0.0 || flight.turn != 0.0 || flight.strafe != 0.0 ||
                            flight.brake;
@@ -499,7 +499,7 @@ int run_tape(App &app, const char *name, const char *json_path) {
         // The plate's rows are chosen in the draw - build_title is where a row's Return is read -
         // so the startup screen renders every frame. Every other screen is drawn on the beats that
         // photograph it; the sim and the update path run on all of them either way.
-        if (app.screen == ui::Screen::Startup || capture_lands) {
+        if (app.current() == ui::Screen::Startup || capture_lands) {
             SDL_GPUCommandBuffer *cmd = SDL_AcquireGPUCommandBuffer(app.renderer.device.handle);
             if (!cmd) fatal("tape: SDL_AcquireGPUCommandBuffer (render)");
             set_phase("tape render");

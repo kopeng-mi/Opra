@@ -82,9 +82,30 @@ Rect BlockLayouter::place(const char *name, float height) {
     return at;
 }
 
+void draw_scrim(UIBatch &batch, const ui::Rect &at) {
+    // Plan 06 §3.4: FIELD at α 0.72 plus 12 px ring at α 0.36 so the edge feathers
+    ui::push_rect(batch, {at.x - 20.0f, at.y - 20.0f}, {at.w + 40.0f, at.h + 40.0f},
+                  ui::with_alpha(ui::tokens::FIELD, 0.36f));
+    ui::push_rect(batch, {at.x - 8.0f, at.y - 8.0f}, {at.w + 16.0f, at.h + 16.0f},
+                  ui::with_alpha(ui::tokens::FIELD, 0.72f));
+}
+
 int check_block_layout(const std::vector<BlockRect> &blocks, const UIBatch &batch,
                        const Rect &safe, bool log) {
     int violations = 0;
+    // New rule (plan 06 §3.6): no block's rect may intersect the arc's reserved span.
+    const float A = std::clamp(safe.w * 0.30f, 300.0f, 520.0f);
+    const float y_apex = (safe.y + safe.h) - 96.0f;
+    const Rect arc_reserved{safe.x + safe.w * 0.5f - A - 56.0f, y_apex - 24.0f,
+                            (A + 56.0f) * 2.0f, 96.0f + 24.0f};
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        if (overlaps(blocks[i].at, arc_reserved)) {
+            ++violations;
+            if (log) {
+                SDL_Log("[hud] block '%s' intersects arc reserved span", blocks[i].name);
+            }
+        }
+    }
     for (size_t i = 0; i < blocks.size(); ++i) {
         const BlockRect &block = blocks[i];
         const Rect slack = inset_rect(safe, block.at);
@@ -185,18 +206,26 @@ struct OrbitLine {
 
 }  // namespace
 
+bool orbit_has_plan_dv(const HudFrame &frame) {
+    if (!frame.orbit.valid) return false;
+    // Plan 06 §3.5: live when differing from node dv by > 0.1 m/s
+    return !frame.nodeValid || std::fabs(frame.orbit.dvPlanned - frame.nodeDeltaV) > 0.1;
+}
+
 float orbit_block_height(const HudFrame &frame) {
     if (!frame.orbit.valid) return 0.0f;
-    return ORBIT_ROW * (ORBIT_FIGURES + 1) + ORBIT_PAD;  // the header plus the plan's six figures
+    const int count = orbit_has_plan_dv(frame) ? 6 : 5;
+    return ORBIT_ROW * (count + 1) + ORBIT_PAD;  // the header plus the active figures
 }
 
 void build_orbit_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at) {
     const OrbitFrame &orbit = frame.orbit;
     if (!orbit.valid) return;
+    draw_scrim(batch, at);
     const std::string escape = "escape";
     char eccentricity[32];
     std::snprintf(eccentricity, sizeof eccentricity, "%.4f", orbit.eccentricity);
-    const OrbitLine lines[ORBIT_FIGURES] = {
+    std::vector<OrbitLine> lines = {
         {"alt", distance_readout(orbit.altitude), ""},
         {"peri", distance_readout(orbit.periapsis),
          orbit.elliptic ? "T- " + clock_readout(orbit.toPeriapsis) : ""},
@@ -204,8 +233,10 @@ void build_orbit_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at
          orbit.elliptic ? "T- " + clock_readout(orbit.toApoapsis) : ""},
         {"ecc", eccentricity, ""},
         {"period", orbit.elliptic ? clock_readout(orbit.period) : escape, ""},
-        {"\u0394v", speed_readout(orbit.dvPlanned), ""},
     };
+    if (orbit_has_plan_dv(frame)) {
+        lines.push_back({"plan dv", speed_readout(orbit.dvPlanned), ""});
+    }
     ui::push_text(batch, "orbit", 13.0f, {at.x, at.y}, TextAlign::Left, ui::tokens::ETCH_DIM,
                   TextFace::Label);
     ui::push_text(batch, orbit.body, 13.0f, {at.x + 46.0f, at.y}, TextAlign::Left,
@@ -213,7 +244,7 @@ void build_orbit_block(UIBatch &batch, const HudFrame &frame, const ui::Rect &at
     // The figures right-align short of the block's edge so the countdown keeps its own column.
     const float right = at.x + at.w;
     const float figure_right = at.x + at.w * 0.62f;
-    for (int i = 0; i < ORBIT_FIGURES; ++i) {
+    for (size_t i = 0; i < lines.size(); ++i) {
         const float y = at.y + ORBIT_ROW * static_cast<float>(i + 1);
         ui::push_text(batch, lines[i].label, 12.0f, {at.x + 10.0f, y + 2.0f}, TextAlign::Left,
                       ui::tokens::ETCH_DIM, TextFace::Label);

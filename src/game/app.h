@@ -24,6 +24,7 @@
 #include "game/viewer.h"
 #include "render/scene.h"
 #include "render/text.h"
+#include "sim/designs.h"
 #include "sim/world.h"
 #include "ui/draw.h"
 #include "ui/flow.h"
@@ -49,6 +50,9 @@ struct App {
     Backdrop backdrop = build_backdrop();
     /** Reused every frame so instance and run vectors keep their capacity. */
     SceneBuilder scene;
+    DesignStore designs;
+    PartTable part_table;
+    void build_part_table();
     /** The LOD hysteresis (plan 05 s2.5): per-object level, kept across frames. */
     std::unordered_map<unsigned long long, int> lod_memory;
     Settings settings;
@@ -56,10 +60,9 @@ struct App {
     ui::Context ui;
     ui::Pointer pointer;
     ui::Nav nav;
-    /** The screen state. Changed only through ui/flow.h's tables. */
-    ui::Screen screen = ui::Screen::Startup;
-    /** Where Back goes from a screen a transition pushed. FLOW says which edges push. */
-    ui::Screen return_to = ui::Screen::Flight;
+    /** The screen stack (plan 06 §2.1). Startup at bottom; current is stack.back(). */
+    std::vector<ui::Screen> stack = {ui::Screen::Startup};
+    ui::Screen current() const { return stack.empty() ? ui::Screen::Startup : stack.back(); }
     Viewer viewer;
     bool wants_quit = false;
     /** Set when a setting changed: the file is written once, at the end of the frame. */
@@ -72,6 +75,15 @@ struct App {
      */
     int title_selected = 0;
     float title_reveal = 0.0f;
+    ui::ContractState contract_state;
+    ui::ShipyardState shipyard_state;
+    ui::ManualState manual_state;
+    ui::ChartState chart_state;
+    float title_zoom = 1.0f;
+    float title_yaw = 0.0f;
+    float title_pitch = orrery::MAP_PITCH;
+    float title_fly_t = 0.0f;
+    bool title_dragging = false;
     /** The title screen's choice, consumed by the update pass on the frame after it is made. */
     ui::TitleAction title_action = ui::TitleAction::None;
     /** The body the planner's transfer aims at, or -1 for none (the map screen's survivor). */

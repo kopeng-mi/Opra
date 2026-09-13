@@ -75,9 +75,8 @@ glm::dvec2 unproject(const Camera &camera, float px, float py, float width, floa
 }
 
 glm::mat4 view_projection(const Camera &camera) {
-    // Up is +Y, not the plane normal: at 90 degrees (straight down) +Z is parallel to the view, and
-    // at every other pitch +Y is the axis that keeps world north pointing up the screen.
-    const glm::mat4 view = glm::lookAt(camera.eye, camera.target, glm::vec3(0.0f, 1.0f, 0.0f));
+    // Up is camera.up (defaults to +Y for flight, where +Y is world north).
+    const glm::mat4 view = glm::lookAt(camera.eye, camera.target, camera.up);
     // Reversed-Z: near maps to 1 and far to 0, so the depth target is cleared to 0 and the mesh
     // pipeline compares GREATER. Both planes are derived from the eye distance (s2.2), so the
     // depth ratio - and therefore reversed-Z's precision - is the same at every zoom.

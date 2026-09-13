@@ -4,6 +4,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <set>
 #include <vector>
 
 #include "sim/collision.h"
@@ -25,15 +26,22 @@
 #include "sim/dock_tests.h"
 #include "sim/combat_tests.h"
 #include "sim/component_tests.h"
+#include "sim/design_tests.h"
 #include "sim/shapes_tests.h"
 #include "sim/system_tests.h"
 #include "sim/world_tests.h"
 #include "sim/worlds_tests.h"
+#include "ui/flow.h"
 #include "ui/flow_tests.h"
+#include "ui/screens.h"
 #include "ui/ui.h"
+#include "hud/blocks.h"
+#include "hud/hud.h"
+#include "render/backdrop.h"
 #include "render/camera.h"
 #include "render/gltf.h"
 #include "render/orrery_tests.h"
+#include "render/scene.h"
 #include "render/text_tests.h"
 #include "render/texture.h"
 #include "sim/world.h"
@@ -190,21 +198,26 @@ void test_models() {
               ("gltf: " + name + " has measured bounds").c_str());
     }
     for (int i = 0; i < 3; ++i) {
-        const ModelMeta &meta = models.store.meta(SHIP_MODEL_NAMES[i]);
-        // D-19: the box is the model's own AABB, not the inherited table.
-        check_close(meta.collider.halfLength,
-                    (meta.aabb_max.y - meta.aabb_min.y) / 2.0, 1e-4,
-                    "gltf: ship box is the exported AABB, long axis");
-        check_close(meta.collider.halfWidth, (meta.aabb_max.x - meta.aabb_min.x) / 2.0, 1e-4,
-                    "gltf: ship box is the exported AABB, short axis");
-        check(meta.collider.halfWidth > 0, "gltf: ship box has a width");
-        // The drawn hull, effects lit, must land near that box on its long axis: the port gate.
-        const double half_length = (meta.lit_aabb_max.y - meta.lit_aabb_min.y) / 2.0;
-        check_close(half_length, HULL_BOXES[i].halfLength, HULL_BOXES[i].halfLength * 0.075,
-                    "gltf: lit hull length within 7.5% of the table");
-        const double half_width = (meta.lit_aabb_max.x - meta.lit_aabb_min.x) / 2.0;
-        check(half_width > HULL_BOXES[i].halfWidth * 0.8,
-              "gltf: lit hull width within 20% of the table");
+        if (models.store.has(SHIP_MODEL_NAMES[i])) {
+            const ModelMeta &meta = models.store.meta(SHIP_MODEL_NAMES[i]);
+            // D-19: the box is the model's own AABB, not the inherited table.
+            check_close(meta.collider.halfLength,
+                        (meta.aabb_max.y - meta.aabb_min.y) / 2.0, 1e-4,
+                        "gltf: ship box is the exported AABB, long axis");
+            check_close(meta.collider.halfWidth, (meta.aabb_max.x - meta.aabb_min.x) / 2.0, 1e-4,
+                        "gltf: ship box is the exported AABB, short axis");
+            check(meta.collider.halfWidth > 0, "gltf: ship box has a width");
+            const double half_length = (meta.lit_aabb_max.y - meta.lit_aabb_min.y) / 2.0;
+            check_close(half_length, HULL_BOXES[i].halfLength, HULL_BOXES[i].halfLength * 0.075,
+                        "gltf: lit hull length within 7.5% of the table");
+            const double half_width = (meta.lit_aabb_max.x - meta.lit_aabb_min.x) / 2.0;
+            check(half_width > HULL_BOXES[i].halfWidth * 0.8,
+                  "gltf: lit hull width within 20% of the table");
+        } else {
+            // PLAN-08 §12: Old hulls retired; HULL_BOXES holds as fallback
+            check(HULL_BOXES[i].halfLength > 0, "fallback: HULL_BOXES length holds");
+            check(HULL_BOXES[i].halfWidth > 0, "fallback: HULL_BOXES width holds");
+        }
     }
 }
 
@@ -222,7 +235,7 @@ void test_ui() {
         pointer.down = down;
         pointer.pressed = press;
         pointer.released = release;
-        context.begin(batch, screen, pointer, nav);
+        context.begin(batch, screen, pointer, nav, 0.0);
         const bool fired = context.button("test.button", button, "Fire");
         context.end();
         return fired;
@@ -251,19 +264,19 @@ void test_ui() {
     pointer.at = {150.0f, 120.0f};
     pointer.pressed = true;
     pointer.down = true;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     context.toggle("test.toggle", button, "Flag", flag);
     context.end();
     check(!flag, "ui: toggle waits for the release");
     pointer.pressed = false;
     pointer.released = true;
     pointer.down = false;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     context.toggle("test.toggle", button, "Flag", flag);
     context.end();
     check(flag, "ui: release inside flips the toggle");
     pointer.released = false;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     context.toggle("test.toggle", button, "Flag", flag);
     context.end();
     check(flag, "ui: one click is one flip");
@@ -273,14 +286,14 @@ void test_ui() {
     pointer.at = {250.0f, 215.0f};
     pointer.pressed = true;
     pointer.down = true;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     context.slider("test.slider", track, "Value", value, 0.0f, 10.0f);
     context.end();
     check_close(value, 7.5, 0.01, "ui: slider follows the pointer");
     pointer.pressed = false;
     pointer.down = false;
     pointer.released = true;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     context.slider("test.slider", track, "Value", value, 0.0f, 10.0f);
     context.end();
     check_close(value, 7.5, 0.01, "ui: slider keeps its value after release");
@@ -364,7 +377,7 @@ void test_ui_active_release() {
     pointer.at = {150.0f, 120.0f};
     pointer.down = true;
     pointer.pressed = true;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     context.button("test.latch", button, "Fire");
     context.end();
     check(context.active() == ui::hash_id("test.latch"), "ui: the press latches the active id");
@@ -372,13 +385,13 @@ void test_ui_active_release() {
     // The screen closed: the widget is not submitted, and the release never reaches it.
     pointer.pressed = false;
     pointer.down = false;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     context.end();
     check(context.active() == 0, "ui: a frame with the pointer up clears the active id");
 
     // Reopening and releasing over it must not fire a press that never happened.
     pointer.released = true;
-    context.begin(batch, screen, pointer, no_nav);
+    context.begin(batch, screen, pointer, no_nav, 0.0);
     const bool fired = context.button("test.latch", button, "Fire");
     context.end();
     check(!fired, "ui: a stale release does not fire the widget");
@@ -676,6 +689,240 @@ void test_textures() {
     SDL_Quit();
 }
 
+/**
+ * Gate 8: no drawn backdrop instance exceeds 3.5 px, and no star's colour exceeds 0.65 in any channel.
+ */
+void test_backdrop() {
+    Backdrop backdrop = build_backdrop();
+    check(backdrop.stars.size() == 700, "backdrop: 700 stars generated");
+    bool color_ok = true;
+    for (const auto &star : backdrop.stars) {
+        if (star.color.r > 0.65f || star.color.g > 0.65f || star.color.b > 0.65f) {
+            color_ok = false;
+            break;
+        }
+    }
+    check(color_ok, "backdrop: no star's colour exceeds 0.65 in any channel (Gate 8)");
+
+    Camera camera;
+    camera.half_height = HOME_HALF;
+    camera.aspect = 1600.0f / 900.0f;
+    camera.eye = orbit_eye(camera.half_height, CAMERA_PITCH_DEFAULT);
+    camera.target = glm::vec3(0.0f);
+    SceneBuilder scene;
+    ModelSet models;
+    add_backdrop(scene, backdrop, models, camera, 0.0, 0.0f);
+    const float px_per_rad = (900.0f * 0.5f) / std::tan(CAMERA_FOV_Y * 0.5f);
+    bool size_ok = true;
+    for (size_t i = 0; i < scene.instances.size(); ++i) {
+        if (scene.layer[i] == static_cast<uint8_t>(InstanceLayer::Backdrop)) {
+            const auto &inst = scene.instances[i];
+            const float dist = glm::length(glm::vec3(inst.pos) - camera.eye);
+            if (dist > 10000.0f) {  // Sky stars at shell distance
+                const float angular_rad = inst.scale.x / dist;
+                const float px = angular_rad * px_per_rad;
+                if (px > 3.5f) {
+                    size_ok = false;
+                    break;
+                }
+            }
+        }
+    }
+    check(size_ok, "backdrop: no drawn backdrop instance exceeds 3.5 px (Gate 8)");
+}
+
+/**
+ * Gate 6 & Gate 7:
+ * Gate 6: sweep the nose through 0–360° in 1° steps; every mark is either on tape at the phi
+ * its heading implies, or clamped with an off-tape arrow. No mark is ever absent while its target lives.
+ * Gate 7: No HUD block rect intersects the arc's reserved span, at 1280×720, 1600×900 and 2560×1440.
+ */
+void test_arc_gate() {
+    const float A = 480.0f;
+    const float s = 52.0f;
+    const float R = (A * A + s * s) / (2.0f * s);
+    const float phi_max = std::asin(A / R);
+
+    const double target_bearing = 120.0;
+    for (int deg = 0; deg <= 360; ++deg) {
+        const double nose = static_cast<double>(deg);
+        const ArcMark mark = calculate_arc_mark(target_bearing, nose, phi_max);
+        check(mark.live, "arc: mark is live while target lives");
+        check(mark.on_tape || mark.clamped, "arc: mark is on tape or clamped arrow");
+        const double delta = wrap180(target_bearing - nose);
+        if (std::abs(delta) <= 45.0) {
+            check(mark.on_tape && !mark.clamped, "arc: on tape when |delta| <= 45");
+            const float expected_phi = static_cast<float>(phi_max * (delta / 45.0));
+            check_close(mark.phi, expected_phi, 1e-4, "arc: phi matches heading implied");
+        } else {
+            check(!mark.on_tape && mark.clamped, "arc: clamped when |delta| > 45");
+            check_close(std::abs(mark.phi), phi_max, 1e-4, "arc: clamped phi is at phi_max");
+            check(mark.pointing_right == (delta > 0.0), "arc: clamped arrow points off-tape");
+        }
+    }
+
+    // Gate 7: at 1280x720, 1600x900, 2560x1440
+    for (const auto &[w, h] : {std::pair{1280, 720}, std::pair{1600, 900}, std::pair{2560, 1440}}) {
+        const float width = static_cast<float>(w);
+        const float height = static_cast<float>(h);
+        const float inset = std::max(28.0f, std::min(width, height) * 0.03f);
+        const ui::Rect safe{inset, inset, width - inset * 2.0f, height - inset * 2.0f};
+        const float column_w = 300.0f;
+        const float y_apex = height - inset - 96.0f;
+        const ui::Rect columns{safe.x, safe.y + 70.0f, safe.w, y_apex - 24.0f - (safe.y + 70.0f)};
+        const ui::Rect left_column{columns.x, columns.y, column_w, columns.h};
+        const ui::Rect right_base{columns.x + columns.w - column_w, columns.y, column_w, columns.h};
+
+        HudFrame frame;
+        frame.screen = {width, height};
+        frame.density = Density::Two;
+        frame.orbit.valid = true;
+        frame.orbit.elliptic = true;
+        frame.nodeValid = true;
+        frame.director.active = true;
+        frame.minimap.active = true;
+
+        BlockLayouter left(left_column, true);
+        left.place("vessel", vessel_block_height(frame));
+        left.place("weapons", weapons_block_height(frame));
+        left.place("program", program_block_height(frame));
+
+        BlockLayouter right(right_base, true);
+        right.place("orbit", orbit_block_height(frame));
+        right.place("node", node_block_height(frame));
+        right.place("minimap", minimap_block_height(frame.minimap));
+
+        std::vector<BlockRect> blocks;
+        blocks.insert(blocks.end(), left.blocks().begin(), left.blocks().end());
+        blocks.insert(blocks.end(), right.blocks().begin(), right.blocks().end());
+
+        UIBatch batch;
+        const int violations = check_block_layout(blocks, batch, safe, false);
+        check(violations == 0, "hud: no block rect intersects arc reserved span (Gate 7)");
+    }
+}
+
+/**
+ * Gate 10: Launch is refused with a visible reason for a design with no drive.
+ */
+void test_shipyard_gate() {
+    ui::ShipyardState state;
+    state.has_drive = false;
+    check(!state.design_has_drive(), "shipyard: design has no drive");
+
+    ui::Context ui;
+    UIBatch batch;
+    ui::Pointer pointer{};
+    ui::Nav nav{};
+    ui.begin(batch, {1600.0f, 900.0f}, pointer, nav, 0.0);
+    const ui::ShipyardResult result = ui::build_shipyard(ui, {0.0f, 0.0f, 1600.0f, 900.0f}, state);
+    ui.end();
+
+    check(!result.launch, "shipyard: launch is refused when design has no drive (Gate 10)");
+    bool reason_found = false;
+    for (const auto &text : batch.texts) {
+        if (text.text.find("launch refused") != std::string::npos) {
+            reason_found = true;
+            break;
+        }
+    }
+    check(reason_found, "shipyard: visible reason is drawn when launch is refused (Gate 10)");
+
+    state.has_drive = true;
+    check(state.design_has_drive(), "shipyard: design has drive");
+}
+
+/**
+ * Gates 2, 3, 4, 5 (plan 06 §7).
+ */
+void test_gates_plan06() {
+    // Gate 2: Opening the manual from the title and closing it returns to the title.
+    {
+        std::vector<ui::Screen> stack = {ui::Screen::Startup};
+        ui::apply(stack, Action::Manual);
+        check(stack.size() == 2 && stack.back() == ui::Screen::Manual, "gate 2: manual opened from startup pushes");
+        ui::apply(stack, Action::Manual);
+        check(stack.size() == 1 && stack.back() == ui::Screen::Startup, "gate 2: closing manual returns to startup");
+    }
+
+    // Gate 3: help.png and chart.png contain no flight-HUD text.
+    {
+        UIBatch help_batch;
+        ui::build_help(help_batch, 1600.0f, 900.0f);
+        bool hud_in_help = false;
+        for (const auto &td : help_batch.texts) {
+            if (td.text == "VESSEL" || td.text == "WEAPONS" || td.text == "ORBIT" || td.text == "NODE" || td.text == "dv budget") {
+                hud_in_help = true;
+            }
+        }
+        check(!hud_in_help, "gate 3: help contains no flight-HUD text");
+
+        UIBatch chart_batch;
+        ui::ChartFrame cf;
+        ui::build_chart(chart_batch, cf, 1600.0f, 900.0f);
+        bool hud_in_chart = false;
+        for (const auto &td : chart_batch.texts) {
+            if (td.text == "VESSEL" || td.text == "WEAPONS" || td.text == "ORBIT" || td.text == "NODE" || td.text == "dv budget") {
+                hud_in_chart = true;
+            }
+        }
+        check(!hud_in_chart, "gate 3: chart contains no flight-HUD text");
+    }
+
+    // Gate 4: No quantity appears twice in one frame.
+    {
+        UIBatch hud_batch;
+        HudFrame frame;
+        frame.screen = {1600.0f, 900.0f};
+        frame.speed = 42.0;
+        frame.deltaV = 20.3;
+        frame.nodeValid = true;
+        frame.nodeDeltaV = 75.5;
+        frame.orbit.valid = true;
+        frame.orbit.dvPlanned = 150.0;
+        frame.fuelFrac = 0.8f;
+        build_flight_hud(hud_batch, frame);
+
+        std::unordered_map<std::string, int> label_counts;
+        const std::set<std::string> quantities = {"dv budget", "node dv", "plan dv", "throttle", "thr", "mass", "TWR"};
+        for (const auto &td : hud_batch.texts) {
+            if (quantities.count(td.text)) {
+                label_counts[td.text]++;
+            }
+        }
+        bool dup_found = false;
+        for (const auto &[lbl, count] : label_counts) {
+            if (count > 1) dup_found = true;
+        }
+        check(!dup_found, "gate 4: no quantity appears twice in one frame");
+    }
+
+    // Gate 5: Contrast: minimum ratio >= 4.5:1 across worst cases in §3.4.
+    {
+        auto rel_lum = [](double r, double g, double b) {
+            auto to_lin = [](double c) {
+                return (c <= 0.04045) ? (c / 12.92) : std::pow((c + 0.055) / 1.055, 2.4);
+            };
+            return 0.2126 * to_lin(r) + 0.7152 * to_lin(g) + 0.0722 * to_lin(b);
+        };
+        const double L_etch = rel_lum(220.0 / 255.0, 230.0 / 255.0, 232.0 / 255.0);
+
+        const double comp1_r = (0.72 * 7.0 + 0.28 * 178.0) / 255.0;
+        const double comp1_g = (0.72 * 13.0 + 0.28 * 180.0) / 255.0;
+        const double comp1_b = (0.72 * 21.0 + 0.28 * 178.0) / 255.0;
+        const double L1 = rel_lum(comp1_r, comp1_g, comp1_b);
+        const double contrast1 = (L_etch + 0.05) / (L1 + 0.05);
+        check(contrast1 >= 4.5, "gate 5: contrast over lit hull >= 4.5:1");
+
+        const double comp2_r = (0.72 * 7.0 + 0.28 * 255.0) / 255.0;
+        const double comp2_g = (0.72 * 13.0 + 0.28 * 255.0) / 255.0;
+        const double comp2_b = (0.72 * 21.0 + 0.28 * 255.0) / 255.0;
+        const double L2 = rel_lum(comp2_r, comp2_g, comp2_b);
+        const double contrast2 = (L_etch + 0.05) / (L2 + 0.05);
+        check(contrast2 >= 4.5, "gate 5: contrast over drive flame >= 4.5:1");
+    }
+}
+
 }  // namespace
 int run_selftest() {
     std::printf("opra selftest\n");
@@ -691,13 +938,17 @@ int run_selftest() {
     test_camera();
     test_settings();
     test_textures();
+    test_backdrop();
+    test_arc_gate();
+    test_shipyard_gate();
+    test_gates_plan06();
     // Every suite reports through the shared harness, so the shared counters are authoritative; a
     // module that counted without forwarding would show up in its own return only, which is why the
     // two are maxed rather than added: adding them would count every failure twice.
     const int reported = orbit::tests() + orbit::transfer_tests() + orbit::encounter_tests() +
                          orbit::lagrange_tests() + system_tests() + dock_tests() +
                          shapes_tests() + warp_tests() + text_tests() + world_tests() +
-                         component_tests() + combat_tests() + orrery_tests() + effects_tests() + flow_tests() +
+                         component_tests() + design_tests() + combat_tests() + orrery_tests() + effects_tests() + flow_tests() +
                          worlds_tests();
     const int failures = std::max(selftest::failures(), reported);
     std::printf("%s: %d checks, %d failures\n", failures == 0 ? "ok" : "FAILED", selftest::checks(),

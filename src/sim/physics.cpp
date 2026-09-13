@@ -50,6 +50,23 @@ constexpr Real JET_TORQUE[4] = {1, -1, -1, 1};
 
 /** Assigns each jet its share of this step's demanded torque, lateral translation and braking. */
 void solve_rcs(ShipState &state, Real torque_demand, Real lateral_demand, Real brake_demand) {
+    if (!state.rcsArms.empty()) {
+        const size_t n = state.rcsArms.size();
+        if (state.rcsJet.size() != n) state.rcsJet.resize(n, 0.0);
+        for (size_t k = 0; k < n; ++k) {
+            const Vec2 r = state.rcsArms[k];
+            const Real fx_sign = r.x > 0.5 ? -1.0 : (r.x < -0.5 ? 1.0 : 0.0);
+            const Real y_sign = (r.y > 0.001) ? 1.0 : ((r.y < -0.001) ? -1.0 : 0.0);
+            const Real tor_sign = -y_sign * fx_sign;
+
+            const Real lat = (fx_sign == 0.0) ? 1.0 : ((lateral_demand * fx_sign > 0.0) ? 1.0 : 0.0);
+            const Real tor = (tor_sign == 0.0) ? 1.0 : ((torque_demand * tor_sign > 0.0) ? 1.0 : 0.0);
+            const Real a_k = clampr(std::abs(torque_demand) * tor + std::abs(lateral_demand) * lat + brake_demand, 0.0, 1.0);
+            state.rcsJet[k] = a_k;
+        }
+        return;
+    }
+    if (state.rcsJet.size() < 4) state.rcsJet.resize(4, 0.0);
     for (int i = 0; i < 4; ++i) {
         Real authority = 0;
         if (torque_demand * JET_TORQUE[i] > 0) authority += std::abs(torque_demand);

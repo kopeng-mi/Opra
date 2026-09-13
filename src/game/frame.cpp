@@ -59,10 +59,10 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     // report is read from. Silent otherwise.
     if (app.debug) {
         static bool paused_before = false;
-        const bool paused_now = app.screen != ui::Screen::Flight;
+        const bool paused_now = app.current() != ui::Screen::Flight;
         if (paused_now != paused_before) {
             SDL_Log("[input] paused %d -> %d (viewer %d) at t+%.2f", paused_before ? 1 : 0,
-                    paused_now ? 1 : 0, app.screen == ui::Screen::Viewer ? 1 : 0,
+                    paused_now ? 1 : 0, app.current() == ui::Screen::Viewer ? 1 : 0,
                     app.world.elapsed);
             paused_before = paused_now;
         }
@@ -91,7 +91,7 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
                 ship.angularVelocity * 57.29577951308232, static_cast<double>(ship.thrustLevel),
                 static_cast<double>(ship.hull), static_cast<double>(ship.fuel),
                 static_cast<double>(app.half_height_current), app.warp.rate(), ship.assist ? 1 : 0,
-                app.screen != ui::Screen::Flight ? 1 : 0);
+                app.current() != ui::Screen::Flight ? 1 : 0);
     }
     // F1: the follow. It steps with the wall-clock dt, not the sim's fixed step, so the framing is
     // frame-rate independent; a step bigger than the snap distance (a warp jump, a reset) is
@@ -116,14 +116,14 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     World &world = app.world;
 
     // The model viewer owns the frame while it is up: its own camera, its own input.
-    if (app.screen == ui::Screen::Viewer) {
+    if (app.current() == ui::Screen::Viewer) {
         update_viewer(app.viewer, input, app.models);
         if (pressed(input, Action::ModelViewer)) {
-            app.screen = ui::advance(app.screen, Action::ModelViewer);
+            ui::apply(app.stack, Action::ModelViewer);
         } else if (pressed(input, Action::Pause)) {
-            app.screen = ui::advance(app.screen, Action::Pause);
+            ui::apply(app.stack, Action::Pause);
         }
-        if (app.screen != ui::Screen::Viewer) app.toast("Flight view");
+        if (app.current() != ui::Screen::Viewer) app.toast("Flight view");
         if (app.settings_dirty) {
             app.settings.save();
             app.settings_dirty = false;
@@ -137,18 +137,14 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         const ui::TitleAction action = app.title_action;
         app.title_action = ui::TitleAction::None;
         switch (action) {
-            case ui::TitleAction::Continue:
-                app.screen = ui::advance_menu(app.screen, ui::MenuAction::TitleContinue);
-                break;
-            case ui::TitleAction::NewContract:
-                app.reset_run();
-                app.screen = ui::advance_menu(app.screen, ui::MenuAction::TitleNewContract);
+            case ui::TitleAction::Begin:
+                ui::apply_menu(app.stack, ui::MenuAction::TitleBegin);
                 break;
             case ui::TitleAction::Settings:
-                app.screen = ui::advance_menu(app.screen, ui::MenuAction::TitleSettings);
+                ui::apply_menu(app.stack, ui::MenuAction::TitleSettings);
                 break;
             case ui::TitleAction::Manual:
-                app.screen = ui::advance_menu(app.screen, ui::MenuAction::TitleManual);
+                ui::apply_menu(app.stack, ui::MenuAction::TitleManual);
                 break;
             case ui::TitleAction::Quit: app.wants_quit = true; break;
             case ui::TitleAction::None: break;
@@ -158,9 +154,33 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
 
     // The startup plate owns the frame while it is up: it is the one screen where the flight
     // HUD, the cutter and the camera keys all stand down.
-    if (app.screen == ui::Screen::Startup) {
+    if (app.current() == ui::Screen::Startup) {
         app.title_reveal = std::min(1.0f, app.title_reveal + static_cast<float>(dt) * 0.85f);
+        app.title_yaw = std::remainder(app.title_yaw + static_cast<float>(dt) * 0.012f, 6.2831853f);
         app.map_frame = orrery_frame_for(app.world, app.map_target);
+
+        // Wheel zooms, drag rotates turntable
+        if (input.pointer.x > 420.0f) {
+            if (input.wheel != 0.0f) {
+                app.title_zoom = std::clamp(
+                    app.title_zoom * (input.wheel > 0.0f ? 1.12f : 0.89f), 0.25f, 4.0f);
+            }
+            if (input.left_pressed()) app.title_dragging = true;
+            if (!input.left) app.title_dragging = false;
+            if (app.title_dragging && input.pointer_valid) {
+                const glm::vec2 delta = input.pointer - app.last_click_at_px;
+                app.title_yaw -= delta.x * 0.01f;
+                app.title_pitch = std::clamp(app.title_pitch + delta.y * 0.008f, 0.2f, 1.56f);
+            }
+        }
+        app.last_click_at_px = input.pointer;
+
+        if (app.title_selected == 0) {
+            app.title_fly_t = std::min(1.0f, app.title_fly_t + static_cast<float>(dt) / 0.8f);
+        } else {
+            app.title_fly_t = std::max(0.0f, app.title_fly_t - static_cast<float>(dt) / 0.8f);
+        }
+
         app.pointer.at = input.pointer;
         app.pointer.valid = input.pointer_valid;
         app.pointer.down = input.left;
@@ -175,12 +195,102 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         return;
     }
 
+    if (app.current() == ui::Screen::Contract) {
+        app.pointer.at = input.pointer;
+        app.pointer.valid = input.pointer_valid;
+        app.pointer.down = input.left;
+        app.pointer.pressed = input.left_pressed();
+        app.pointer.released = input.left_released();
+        app.pointer.wheel = input.wheel;
+        app.nav.next = input.pressed(SDL_SCANCODE_TAB) || input.pressed(SDL_SCANCODE_DOWN);
+        app.nav.previous = input.pressed(SDL_SCANCODE_UP);
+        app.nav.activate = input.pressed(SDL_SCANCODE_RETURN) || input.pressed(SDL_SCANCODE_KP_ENTER);
+        // Dragging & zooming in chart area (plan 06 §4.2)
+        if (input.pointer.x < static_cast<float>(width) - 360.0f) {
+            if (input.left_pressed()) {
+                app.contract_state.dragging = true;
+                app.contract_state.drag_start = input.pointer;
+            }
+            if (input.wheel != 0.0f) {
+                app.contract_state.zoom = std::clamp(
+                    app.contract_state.zoom * (input.wheel > 0.0f ? 1.15f : 0.85f), 0.3f, 4.0f);
+            }
+        }
+        if (app.contract_state.dragging) {
+            if (input.left) {
+                app.contract_state.pan += input.pointer - app.contract_state.drag_start;
+                app.contract_state.drag_start = input.pointer;
+            } else {
+                app.contract_state.dragging = false;
+            }
+        }
+        if (pressed(input, Action::Pause)) {
+            ui::apply(app.stack, Action::Pause);
+        }
+        return;
+    }
+
+    if (app.current() == ui::Screen::Shipyard) {
+        app.pointer.at = input.pointer;
+        app.pointer.valid = input.pointer_valid;
+        app.pointer.down = input.left;
+        app.pointer.pressed = input.left_pressed();
+        app.pointer.released = input.left_released();
+        app.pointer.wheel = input.wheel;
+        app.nav.next = input.pressed(SDL_SCANCODE_TAB) || input.pressed(SDL_SCANCODE_DOWN);
+        app.nav.previous = input.pressed(SDL_SCANCODE_UP);
+        app.nav.activate = input.pressed(SDL_SCANCODE_RETURN) || input.pressed(SDL_SCANCODE_KP_ENTER);
+
+        if (input.pressed(SDL_SCANCODE_1)) {
+            app.shipyard_state.yaw_target = 0.6f;
+            app.shipyard_state.pitch_target = 0.35f;
+        } else if (input.pressed(SDL_SCANCODE_2)) {
+            app.shipyard_state.yaw_target = 0.0f;
+            app.shipyard_state.pitch_target = 1.396f;
+        } else if (input.pressed(SDL_SCANCODE_3)) {
+            app.shipyard_state.yaw_target = 1.571f;
+            app.shipyard_state.pitch_target = 0.10f;
+        } else if (input.pressed(SDL_SCANCODE_4)) {
+            app.shipyard_state.yaw_target = 3.74f;
+            app.shipyard_state.pitch_target = 0.35f;
+        }
+
+        if (input.pointer.x > 260.0f && input.pointer.x < static_cast<float>(width) - 300.0f) {
+            if (input.wheel != 0.0f) {
+                app.shipyard_state.distance_target = std::clamp(
+                    app.shipyard_state.distance_target * (1.0f - input.wheel * 0.08f), 0.35f, 3.0f);
+            }
+            if (input.left_pressed()) app.shipyard_state.dragging = true;
+            if (!input.left) app.shipyard_state.dragging = false;
+            if (app.shipyard_state.dragging && input.pointer_valid) {
+                const glm::vec2 delta = input.pointer - app.shipyard_state.pointer;
+                app.shipyard_state.yaw_target -= delta.x * 0.01f;
+                app.shipyard_state.pitch_target = std::clamp(app.shipyard_state.pitch_target + delta.y * 0.008f, -0.349f, 1.396f);
+            }
+        }
+        app.shipyard_state.pointer = input.pointer;
+
+        // Turntable damping
+        const float k = 1.0f - std::exp(-static_cast<float>(dt) / 0.09f);
+        float dyaw = std::remainder(app.shipyard_state.yaw_target - app.shipyard_state.yaw, 6.2831853f);
+        app.shipyard_state.yaw += dyaw * k;
+        app.shipyard_state.pitch += (app.shipyard_state.pitch_target - app.shipyard_state.pitch) * k;
+        app.shipyard_state.distance += (app.shipyard_state.distance_target - app.shipyard_state.distance) * k;
+
+        if (pressed(input, Action::Pause)) {
+            ui::apply(app.stack, Action::Pause);
+        }
+        return;
+    }
+
     // This frame's UI input: the pointer plus the keyboard navigation edges.
     app.pointer.at = input.pointer;
     app.pointer.valid = input.pointer_valid;
     app.pointer.down = input.left;
     app.pointer.pressed = input.left_pressed();
     app.pointer.released = input.left_released();
+    app.pointer.right_down = input.right;
+    app.pointer.right_pressed = input.right_pressed();
     app.pointer.wheel = input.wheel;
     app.nav.next = input.pressed(SDL_SCANCODE_TAB) || input.pressed(SDL_SCANCODE_DOWN);
     app.nav.previous = input.pressed(SDL_SCANCODE_UP);
@@ -313,11 +423,11 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     };
 
     if (pressed(input, Action::Pause)) {
-        const ui::Screen before = app.screen;
-        app.screen = ui::advance(app.screen, Action::Pause);
-        if (before == ui::Screen::Flight && app.screen == ui::Screen::Pause) {
+        const ui::Screen before = app.current();
+        ui::apply(app.stack, Action::Pause);
+        if (before == ui::Screen::Flight && app.current() == ui::Screen::Pause) {
             app.toast("Paused");
-        } else if (before == ui::Screen::Pause && app.screen == ui::Screen::Flight) {
+        } else if (before == ui::Screen::Pause && app.current() == ui::Screen::Flight) {
             app.toast("Flight resumed");
         }
     }
@@ -327,11 +437,78 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     // These keys are edges of Flight and of the instrument screens themselves: M opens the chart
     // from flight and closes it from the chart, and FLOW says which is which. They are read before
     // the return below, or an instrument could only ever be left with Esc.
-    if (pressed(input, Action::Manual)) app.screen = ui::advance(app.screen, Action::Manual);
-    if (pressed(input, Action::Chart)) app.screen = ui::advance(app.screen, Action::Chart);
+    // Chart screen interaction: pan, zoom, click marker to target, N plans transfer (plan 06 §4.5)
+    if (app.current() == ui::Screen::Chart) {
+        if (input.wheel != 0.0f) {
+            app.chart_state.zoom = std::clamp(
+                app.chart_state.zoom * (input.wheel > 0.0f ? 1.15f : 0.85f), 0.3f, 5.0f);
+        }
+        if (input.left_pressed()) {
+            app.chart_state.dragging = true;
+            app.chart_state.drag_start = input.pointer;
+
+            const auto chart = chart_frame_for(app.world);
+            const float margin = 90.0f;
+            const float span_x = std::max(100.0f, chart.bounds_max.x - chart.bounds_min.x);
+            const float span_y = std::max(100.0f, chart.bounds_max.y - chart.bounds_min.y);
+            const float base_scale = std::min((static_cast<float>(width) - margin * 2.0f) / span_x,
+                                              (static_cast<float>(height) - margin * 2.0f - 60.0f) / span_y);
+            const float scale = base_scale * app.chart_state.zoom;
+            const glm::vec2 origin(static_cast<float>(width) * 0.5f + app.chart_state.pan.x,
+                                  static_cast<float>(height) * 0.5f + 20.0f + app.chart_state.pan.y);
+            for (size_t i = 0; i < chart.marks.size(); ++i) {
+                const glm::vec2 pt(origin.x + chart.marks[i].at.x * scale,
+                                   origin.y - chart.marks[i].at.y * scale);
+                if (glm::length(pt - input.pointer) < 22.0f) {
+                    app.chart_state.selected_mark = static_cast<int>(i);
+                    app.toast(std::string("Track: ") + chart.marks[i].text);
+                    break;
+                }
+            }
+        }
+        if (app.chart_state.dragging) {
+            if (input.left) {
+                app.chart_state.pan += input.pointer - app.chart_state.drag_start;
+                app.chart_state.drag_start = input.pointer;
+            } else {
+                app.chart_state.dragging = false;
+            }
+        }
+        if (pressed(input, Action::PlanNode)) {
+            app.plan_transfer();
+            app.toast("Transfer planned");
+        }
+        if (pressed(input, Action::Chart) || pressed(input, Action::Pause)) {
+            ui::apply(app.stack, Action::Chart);
+        }
+        return;
+    }
+
+    if (pressed(input, Action::Manual)) ui::apply(app.stack, Action::Manual);
+    if (pressed(input, Action::Chart)) ui::apply(app.stack, Action::Chart);
     if (pressed(input, Action::ModelViewer)) {
-        app.screen = ui::advance(app.screen, Action::ModelViewer);
-        if (app.screen == ui::Screen::Viewer) app.toast("Model viewer");
+        ui::apply(app.stack, Action::ModelViewer);
+        if (app.current() == ui::Screen::Viewer) app.toast("Model viewer");
+    }
+
+    // Manual screen interaction: pagination and typing filter (plan 06 §4.6)
+    if (app.current() == ui::Screen::Manual) {
+        if (input.pressed(SDL_SCANCODE_LEFT) || input.pressed(SDL_SCANCODE_PAGEUP)) {
+            if (app.manual_state.page > 0) --app.manual_state.page;
+        }
+        if (input.pressed(SDL_SCANCODE_RIGHT) || input.pressed(SDL_SCANCODE_PAGEDOWN)) {
+            ++app.manual_state.page;
+        }
+        if (input.pressed(SDL_SCANCODE_BACKSPACE)) {
+            if (!app.manual_state.filter.empty()) app.manual_state.filter.pop_back();
+        }
+        for (int sc = SDL_SCANCODE_A; sc <= SDL_SCANCODE_Z; ++sc) {
+            if (input.pressed(static_cast<SDL_Scancode>(sc))) {
+                if (sc != SDL_SCANCODE_H && sc != SDL_SCANCODE_ESCAPE) {
+                    app.manual_state.filter += static_cast<char>('a' + (sc - SDL_SCANCODE_A));
+                }
+            }
+        }
     }
     // Close quarters (plan 05 s5): the PDCs' release, then a torpedo at whatever is tracked.
     if (pressed(input, Action::WeaponsFree)) {
@@ -351,7 +528,7 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     if (pressed(input, Action::WarpToNode)) {
         if (app.world.warp_to_next_node()) app.toast("Burn complete");
     }
-    if (app.screen != ui::Screen::Flight) return;
+    if (app.current() != ui::Screen::Flight) return;
 
     if (pressed(input, Action::Cinematic)) {
         app.cinematic = !app.cinematic;
@@ -464,7 +641,7 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
 
     // The mining cutter: right button or C, aimed by the pointer inside the mount's arc.
     app.mining = (input.right || input.held(SDL_SCANCODE_C)) &&
-                 app.screen != ui::Screen::Manual && app.screen != ui::Screen::Chart;
+                 app.current() != ui::Screen::Manual && app.current() != ui::Screen::Chart;
     if (app.mining) {
         const Real heading_angle = world.ship.angle;
         const glm::dvec2 forward(-std::sin(heading_angle), std::cos(heading_angle));
@@ -525,30 +702,93 @@ void render_app(App &app, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *color,
 
     app.scene.clear();
     UIBatch ui;
-    if (app.screen == ui::Screen::Startup) {
-        // The orrery turns behind the title plate: the one screen the flight camera does not own
-        // (E12). The map screen it shared a camera with is one continuous zoom now (plan 05 J2).
-        orrery::build(app.scene, app.orrery_meshes, app.map_frame);
+    if (app.current() == ui::Screen::Startup) {
+        Camera camera = active_camera(app, width, height);
+
+        // Light (PLAN-08 §10.2)
+        const glm::vec3 dir_to_star = glm::normalize(glm::vec3(-0.45f, 0.25f, 0.35f));
+        app.scene.light.direction_to_star = dir_to_star;
+        app.scene.light.color = glm::vec3(0.95f, 0.90f, 0.82f);
+
+        // Real sky backdrop
+        add_backdrop(app.scene, app.backdrop, app.models, camera, app.now, 260.0f);
+
+        // Station spun by 0.02 * t
+        const float station_spin = 0.02f * static_cast<float>(app.now);
+        for (const std::string &mname : app.models.store.names()) {
+            if (mname == "station") {
+                app.scene.add_model(app.models.store.model("station"),
+                                    glm::vec3(0.0f), spin_about_z(station_spin), 1.0f, false, 0.0f);
+                break;
+            }
+        }
+
+        // Berthed ship at station Port A: nose along port normal [1, 0], 1.2 m proud
+        const float ship_half_len = static_cast<float>(app.world.ship.bounds.halfLength > 0 ? app.world.ship.bounds.halfLength : 24.0);
+        const glm::vec3 ship_pos{100.6f + 1.2f - ship_half_len, -8.0f, 0.0f};
+        const glm::quat ship_rot = glm::angleAxis(-1.5707963f, glm::vec3(0.0f, 0.0f, 1.0f));
+        if (!app.world.design.placements.empty()) {
+            std::vector<Real> jets(app.world.design.placements.size(), 0.0);
+            add_design(app.scene, app.models, app.world.design, ship_pos, ship_rot,
+                       static_cast<float>(app.world.design.scale), 3, 0.0f, jets);
+        }
+
+        // 2D Ephemeris chart ink in UI batch behind title block
+        const ui::Rect ephemeris_rect{0.0f, 0.0f, static_cast<float>(width) * 0.45f, static_cast<float>(height)};
+        ui::build_ephemeris(ui, app.map_frame, ephemeris_rect, app.title_reveal);
+
         const ui::Rect screen{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
         app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer,
-                     app.nav);
+                     app.nav, app.now);
         ui::TitleFrame title;
-        title.sessionSeconds = app.world.elapsed;
-        title.docked = app.world.docked;
-        title.dockName = "Wayfarer";
-        title.shipName = app.world.ship.spec ? app.world.ship.spec->name : "";
         title.reveal = app.title_reveal;
         const ui::TitleAction action =
             ui::build_title(app.ui, screen, title, app.title_selected);
         if (action != ui::TitleAction::None) app.title_action = action;
         app.ui.end();
+        draw_frame(renderer, app.text, cmd, color, format, width, height, camera, app.scene, ui);
+        return;
+    }
+    if (app.current() == ui::Screen::Contract) {
+        const ui::Rect screen{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
+        app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer,
+                     app.nav, app.now);
+        const ui::ContractResult result =
+            ui::build_contract(app.ui, screen, app.contract_state, chart_frame_for(app.world));
+        if (result.accept) {
+            app.shipyard_state.design = app.world.design;
+            app.shipyard_state.parts = app.part_table;
+            app.shipyard_state.spec_dirty = true;
+            ui::apply_menu(app.stack, ui::MenuAction::ContractAccept);
+        } else if (result.back) {
+            ui::apply_menu(app.stack, ui::MenuAction::ContractBack);
+        }
+        app.ui.end();
         draw_frame(renderer, app.text, cmd, color, format, width, height, app.camera, app.scene, ui);
         return;
     }
-    if (app.screen == ui::Screen::Viewer) {
+    if (app.current() == ui::Screen::Shipyard) {
+        const ui::Rect screen{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
+        app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer, app.nav, app.now);
+        const ui::ShipyardResult result = ui::build_shipyard(app.ui, screen, app.shipyard_state);
+        if (result.launch && app.shipyard_state.design_has_drive()) {
+            app.world.design = app.shipyard_state.design;
+            app.world.rebuild_from_design(app.part_table);
+            app.sync_ship_collider();
+            app.sync_ports();
+            ui::apply_menu(app.stack, ui::MenuAction::ShipyardLaunch);
+        } else if (result.back) {
+            ui::apply_menu(app.stack, ui::MenuAction::ShipyardBack);
+        }
+        app.ui.end();
+        build_shipyard_scene(app.scene, app.models, app.shipyard_state);
+        draw_frame(renderer, app.text, cmd, color, format, width, height, app.camera, app.scene, ui);
+        return;
+    }
+    if (app.current() == ui::Screen::Viewer) {
         const ui::Rect screen{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
         app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer,
-                     app.nav);
+                     app.nav, app.now);
         build_viewer_ui(app.ui, screen, app.models, app.viewer);
         app.ui.end();
         build_viewer_scene(app.scene, app.models, app.viewer);
@@ -561,28 +801,29 @@ void render_app(App &app, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *color,
                 static_cast<float>(height), app.lod_memory);
 
     HudFrame frame = make_hud_frame(app, width, height);
-    app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer, app.nav);
-    // The menus take the frame: the flight HUD stays out of the way. This is the two menu screens,
-    // not every screen that holds the sim - the chart and the manual still draw the HUD under them.
-    if (app.screen == ui::Screen::Pause || app.screen == ui::Screen::Settings) {
+    app.ui.begin(ui, {static_cast<float>(width), static_cast<float>(height)}, app.pointer, app.nav, app.now);
+    // L5: An overlay screen owns the frame - it suppresses the flight HUD and draws its own surface (T-4).
+    if (app.current() == ui::Screen::Pause || app.current() == ui::Screen::Settings) {
         const ui::Rect screen{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
-        if (app.screen == ui::Screen::Settings) {
+        if (app.current() == ui::Screen::Settings) {
             const ui::SettingsResult result = ui::build_settings(app.ui, screen, app.settings);
             if (result.back) {
-                app.screen = ui::advance_menu(app.screen, ui::MenuAction::SettingsBack);
+                ui::apply_menu(app.stack, ui::MenuAction::SettingsBack);
             }
             if (result.changed) app.apply_settings();
         } else {
             const ui::PauseResult result = ui::build_pause(app.ui, screen);
             if (result.resume) {
-                app.screen = ui::advance_menu(app.screen, ui::MenuAction::PauseResume);
+                ui::apply_menu(app.stack, ui::MenuAction::PauseResume);
             }
             if (result.open_settings) {
-                app.screen = ui::advance_menu(app.screen, ui::MenuAction::PauseSettings);
+                ui::apply_menu(app.stack, ui::MenuAction::PauseSettings);
             }
-            if (result.quit) app.wants_quit = true;
+            if (result.quit) {
+                ui::apply_menu(app.stack, ui::MenuAction::PauseAbandon);
+            }
         }
-    } else if (!app.hud_hidden) {
+    } else if (app.current() == ui::Screen::Flight && !app.hud_hidden) {
         // A port in range replaces the collar with the corridor ladder: the approach is the one
         // time the pilot needs numbers rather than bearings (plan §4.4).
         const DockFrame dock = dock_frame_for(app.world);
@@ -606,7 +847,7 @@ void render_app(App &app, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *color,
     // The zoom overlay (s2.4, s2.6): orbit lines, predicted legs, node marks and icons, drawn into
     // the UI batch so they land after tonemap with the depth test always off. Flight only: the
     // chart and the manual own the whole glass when they are up.
-    if (app.screen == ui::Screen::Flight) {
+    if (app.current() == ui::Screen::Flight) {
         build_zoom_overlay(ui, app.world, app.camera, w, h);
     }
     if (app.beam_active) {
@@ -617,13 +858,13 @@ void render_app(App &app, SDL_GPUCommandBuffer *cmd, SDL_GPUTexture *color,
         ui::push_line(ui, from, to, 2.0f, ui::with_alpha(ui::tokens::DRIVE, 0.9f));
         ui::push_disc(ui, to, 4.0f, ui::with_alpha(ui::tokens::THREAT, 0.9f));
     }
-    if (app.input.pointer_valid && app.screen != ui::Screen::Chart &&
-        app.screen != ui::Screen::Manual) {
+    if (app.input.pointer_valid && app.current() != ui::Screen::Chart &&
+        app.current() != ui::Screen::Manual) {
         ui::push_arc(ui, app.input.pointer, 9.0f, 0.0f, 6.2831853f, 1.0f,
                      ui::with_alpha(ui::tokens::ETCH_DIM, 0.5f));
     }
-    if (app.screen == ui::Screen::Chart) ui::build_chart(ui, chart_frame_for(app.world), w, h);
-    if (app.screen == ui::Screen::Manual) ui::build_help(ui, w, h);
+    if (app.current() == ui::Screen::Chart) ui::build_chart(ui, chart_frame_for(app.world), w, h, &app.chart_state);
+    if (app.current() == ui::Screen::Manual) ui::build_help(ui, w, h, &app.input, &app.manual_state);
     ui::draw_toasts(ui, app.toasts, app.now, 34.0f, 104.0f);
 
     draw_frame(renderer, app.text, cmd, color, format, width, height, app.camera, scene, ui);
@@ -682,6 +923,7 @@ void dump_models(const ModelSet &models, const World &world) {
     }
     // The port gate: the model's own box against the authored collision table.
     for (int i = 0; i < 3; ++i) {
+        if (!models.store.has(SHIP_MODEL_NAMES[i])) continue;
         const ModelMeta &meta = models.store.meta(SHIP_MODEL_NAMES[i]);
         const HullBoxes &table = HULL_BOXES[i];
         const double lit_half_length = (meta.lit_aabb_max.y - meta.lit_aabb_min.y) / 2.0;

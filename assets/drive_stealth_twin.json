@@ -1,0 +1,145 @@
+{
+  "name": "drive_stealth_twin",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.9309,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      2.71,
+      4.2122,
+      1.2679
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -2.9309,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      2.71,
+      9.56,
+      1.2679
+    ]
+  },
+  "collider": {
+    "halfLength": 2.269,
+    "halfWidth": 2.82,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          -1.65,
+          2.25
+        ],
+        "angle": 0,
+        "half": [
+          1,
+          1.65
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          1.65,
+          2.25
+        ],
+        "angle": 0,
+        "half": [
+          1,
+          1.65
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.48
+        ],
+        "angle": 0,
+        "half": [
+          1.8,
+          0.42
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -1.65,
+          2.55
+        ],
+        "angle": 0,
+        "half": [
+          0.75,
+          0.95
+        ]
+      }
+    ],
+    "bounds_radius": 4.8248
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "flame",
+      "pos": [
+        -1.65,
+        3.96,
+        0
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        1.65,
+        3.96,
+        0
+      ]
+    }
+  ],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "drive_stealth_twin_normal",
+      "roughness": "drive_stealth_twin_roughness",
+      "albedo": "drive_stealth_twin_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 9,
+    "vertices": 1876,
+    "triangles": 632
+  },
+  "part": {
+    "kind": "drive_fusion",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 8500,
+    "propellant": 0,
+    "thrust": 1200000,
+    "cooling": 0,
+    "heat_capacity": 10,
+    "rcs_jets": 2,
+    "rcs_authority": 0.02847,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

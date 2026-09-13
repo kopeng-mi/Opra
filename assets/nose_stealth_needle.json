@@ -1,0 +1,124 @@
+{
+  "name": "nose_stealth_needle",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -1.3686,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      1.3686,
+      4.55,
+      1.2679
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -1.3686,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      1.3686,
+      4.55,
+      1.2679
+    ]
+  },
+  "collider": {
+    "halfLength": 2.438,
+    "halfWidth": 1.369,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.71
+        ],
+        "angle": 0,
+        "half": [
+          1.3,
+          0.65
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.55
+        ],
+        "angle": 0,
+        "half": [
+          1.05,
+          0.65
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          2.85
+        ],
+        "radius": 0.775
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          3.7
+        ],
+        "angle": 0,
+        "half": [
+          0.575,
+          0.85
+        ]
+      }
+    ],
+    "bounds_radius": 4.7263
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "nose_stealth_needle_normal",
+      "roughness": "nose_stealth_needle_roughness",
+      "albedo": "nose_stealth_needle_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 8,
+    "vertices": 1296,
+    "triangles": 432
+  },
+  "part": {
+    "kind": "nose_sensor",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 2500,
+    "propellant": 0,
+    "thrust": 0,
+    "cooling": 0,
+    "heat_capacity": 7,
+    "rcs_jets": 2,
+    "rcs_authority": 0.02847,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

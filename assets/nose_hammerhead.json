@@ -1,0 +1,128 @@
+{
+  "name": "nose_hammerhead",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.6,
+      -0.3251,
+      -1.4896
+    ],
+    "max": [
+      2.6,
+      4.4,
+      1.5509
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -2.6,
+      -0.3251,
+      -1.4896
+    ],
+    "max": [
+      2.6,
+      4.4,
+      1.5509
+    ]
+  },
+  "collider": {
+    "halfLength": 2.363,
+    "halfWidth": 2.6,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.58
+        ],
+        "angle": 0,
+        "half": [
+          2.4,
+          0.95
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.58
+        ],
+        "angle": 0,
+        "half": [
+          1.65,
+          0.96
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          3.4
+        ],
+        "angle": 0,
+        "half": [
+          1.1,
+          0.81
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.44
+        ],
+        "angle": 0,
+        "half": [
+          1.72,
+          0.41
+        ]
+      }
+    ],
+    "bounds_radius": 4.7661
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "nose_hammerhead_normal",
+      "roughness": "nose_hammerhead_roughness",
+      "albedo": "nose_hammerhead_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 8,
+    "vertices": 1872,
+    "triangles": 624
+  },
+  "part": {
+    "kind": "nose_command",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 7500,
+    "propellant": 0,
+    "thrust": 0,
+    "cooling": 0,
+    "heat_capacity": 12,
+    "rcs_jets": 2,
+    "rcs_authority": 0.01534,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

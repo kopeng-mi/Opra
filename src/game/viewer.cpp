@@ -98,7 +98,8 @@ Camera Viewer::camera(const ModelSet &models, Uint32 width, Uint32 height) const
     }
     out.half_height = extent * 1.6f * distance;
     out.aspect = height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
-    const glm::vec3 forward(std::cos(pitch) * std::sin(yaw), std::cos(pitch) * std::cos(yaw),
+    out.up = glm::vec3(0.0f, 0.0f, 1.0f);
+    const glm::vec3 forward(std::cos(pitch) * std::sin(yaw), -std::cos(pitch) * std::cos(yaw),
                             std::sin(pitch));
     out.target = glm::vec3(0.0f);
     // D-11/E5: the eye distance is derived from the framing the wheel asks for, so the zoom is real

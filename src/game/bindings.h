@@ -40,6 +40,7 @@ enum class Action {
     ZoomReset,
     ModelViewer,
     Pause,
+    Settings,
     /** Time warp, stepped: 1 / 10 / 100 / 1k / 10k / 100k. Above 10x the ship rides its conic. */
     WarpUp,
     WarpDown,

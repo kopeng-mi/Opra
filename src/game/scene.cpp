@@ -65,6 +65,39 @@ const Model &lod_model(const ModelSet &models, const std::string &name, int leve
     return models.store.model(name);
 }
 
+bool draws_at(const Placement &p, int lod) {
+    if (lod <= 0) return false;
+    if (lod >= 3) return true;
+    if (lod == 1) return is_axial(p.facing) || p.axial;
+    // lod == 2: axial modules + radial pods with span >= 1 (rcs/sensor/lamp kinds drop)
+    if (is_axial(p.facing) || p.axial) return true;
+    if (p.span >= 1 && p.part.find("rcs") == std::string::npos &&
+        p.part.find("sensor") == std::string::npos &&
+        p.part.find("lamp") == std::string::npos) {
+        return true;
+    }
+    return false;
+}
+
+}  // namespace
+
+void add_design(SceneBuilder &scene, const ModelSet &models, const ShipDesign &design,
+                const glm::vec3 &origin, const glm::quat &rotation, float scale, int lod,
+                float thrust, const std::vector<Real> &jets) {
+    for (size_t k = 0; k < design.placements.size(); ++k) {
+        const Placement &p = design.placements[k];
+        if (p.destroyed || !draws_at(p, lod)) continue;
+        const Mount m = mount_transform(design.spine, p);
+        const glm::vec3 at = origin + rotation * (glm::vec3(m.pos) * scale);
+        const glm::quat rot = rotation * glm::quat(m.rot);
+        const float a = k < jets.size() ? static_cast<float>(jets[k]) : 0.0f;
+        scene.add_model(lod_model(models, p.part, lod), at, rot, scale,
+                        thrust > 0.02f, thrust, glm::vec3(1.0f), glm::vec4(a));
+    }
+}
+
+namespace {
+
 /**
  * A hex colour like "#ff9c5c" as a tint, or white when it does not parse: the system file carries
  * each body's albedo tint, and a body without a map still deserves its own hue.
@@ -315,18 +348,29 @@ void build_scene(SceneBuilder &scene, const ModelSet &models, const World &world
     const int ship_class = static_cast<int>(world.ship.shipClass);
     const float thrust = std::max(0.0f, static_cast<float>(world.ship.thrustLevel));
     // The sim already solved the jets; the renderer only has to fade each cone on its own share.
-    const glm::vec4 jets(static_cast<float>(world.ship.rcsJet[0]), static_cast<float>(world.ship.rcsJet[1]),
-                         static_cast<float>(world.ship.rcsJet[2]), static_cast<float>(world.ship.rcsJet[3]));
+    const glm::vec4 jets(
+        world.ship.rcsJet.size() > 0 ? static_cast<float>(world.ship.rcsJet[0]) : 0.0f,
+        world.ship.rcsJet.size() > 1 ? static_cast<float>(world.ship.rcsJet[1]) : 0.0f,
+        world.ship.rcsJet.size() > 2 ? static_cast<float>(world.ship.rcsJet[2]) : 0.0f,
+        world.ship.rcsJet.size() > 3 ? static_cast<float>(world.ship.rcsJet[3]) : 0.0f);
     const std::string ship_model = SHIP_MODEL_NAMES[ship_class];
     // The own ship follows the same rule as everything else (s2.5): under eight px the chevron in
     // the overlay is the honest mark and the hull stands down.
-    if (select(0, world.ship.position.x, world.ship.position.y,
-               static_cast<Real>(world.ship.bounds.halfLength)) >= 1) {
-        scene.add_model(lod_model(models, ship_model, 2),
-                        relative(origin, world.ship.position.x, world.ship.position.y, 0.0),
-                        spin_about_z(static_cast<float>(world.ship.angle)), config::SHIP_SCALE,
-                        world.ship.thrustLevel > 0.02f, ui::clamp01(thrust / 1.65f), glm::vec3(1.0f),
-                        jets);
+    const int lod = select(0, world.ship.position.x, world.ship.position.y,
+                           static_cast<Real>(world.ship.bounds.halfLength));
+    if (lod >= 1) {
+        const glm::vec3 ship_pos = relative(origin, world.ship.position.x, world.ship.position.y, 0.0);
+        const glm::quat ship_rot = spin_about_z(static_cast<float>(world.ship.angle));
+        if (!world.design.placements.empty()) {
+            add_design(scene, models, world.design, ship_pos, ship_rot,
+                       static_cast<float>(world.design.scale), lod,
+                       ui::clamp01(thrust / 1.65f), world.ship.rcsJet);
+        } else {
+            scene.add_model(lod_model(models, ship_model, lod),
+                            ship_pos, ship_rot, config::SHIP_SCALE,
+                            world.ship.thrustLevel > 0.02f, ui::clamp01(thrust / 1.65f), glm::vec3(1.0f),
+                            jets);
+        }
     }
 
     // Contact sparks, fracture dust and trails, the dock pulse: the sim's edges, as light. Every
@@ -791,15 +835,15 @@ opra::HudFrame make_hud_frame(App &app, Uint32 width, Uint32 height) {
     frame.thrust = static_cast<float>(world.ship.thrustLevel);
     frame.heat = static_cast<float>(world.ship.heat);
     frame.time = static_cast<float>(world.elapsed);
-    frame.hideCollar = app.screen == ui::Screen::Chart || app.screen == ui::Screen::Manual ||
+    frame.hideCollar = app.current() == ui::Screen::Chart || app.current() == ui::Screen::Manual ||
                        app.cinematic;
     frame.sessionSeconds = static_cast<float>(world.elapsed);
-    frame.status = app.screen != ui::Screen::Flight
+    frame.status = app.current() != ui::Screen::Flight
                        ? opra::StatusDot::Paused
                        : (world.ship.hull < world.ship.spec->hull * 0.5
                               ? opra::StatusDot::UnderFire
                               : opra::StatusDot::Nominal);
-    frame.chartOpen = app.screen == ui::Screen::Chart;
+    frame.chartOpen = app.current() == ui::Screen::Chart;
     frame.zoom = app.half_height_current;
     // F10: the density the pilot chose, the context that overrides it, and the pass's switch.
     frame.density = app.density;
@@ -935,7 +979,7 @@ opra::HudFrame make_hud_frame(App &app, Uint32 width, Uint32 height) {
         }
     }
 
-    if (app.screen != ui::Screen::Flight) {
+    if (app.current() != ui::Screen::Flight) {
         frame.context = "paused  Esc to resume";
         frame.contextColor = ui::tokens::DRIVE;
     } else if (world.docked) {
@@ -1006,12 +1050,9 @@ opra::HudFrame make_hud_frame(App &app, Uint32 width, Uint32 height) {
                 frame.twrValid = true;
             }
         }
-        // dv = Isp * g0 * ln(m_wet/m_dry). The sim's exhaust model is the thrust divided by its
-        // full-throttle flow (14 t/s), and the ln is guarded: empty tanks print 0.00, not -inf.
-        const Real mdot = 14000.0;
-        const double isp_g0 = mdot > 0.0 ? static_cast<double>(world.ship.spec->thrust) / mdot : 0.0;
+        // dv = Isp * g0 * ln(m_wet/m_dry). Full-throttle burn is 14 kg/s (PLAN-08 §3.5).
         const Real dry = world.ship.spec->mass;
-        frame.deltaV = wet > dry * 1.0000001 ? isp_g0 * std::log(static_cast<double>(wet) / dry) : 0.0;
+        frame.deltaV = calculate_delta_v(world.ship.spec->thrust, dry, wet);
         frame.burnSeconds = world.ship.spec->thrust > 0.0
                                 ? frame.deltaV * wet / static_cast<double>(world.ship.spec->thrust)
                                 : 0.0;

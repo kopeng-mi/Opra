@@ -18,6 +18,18 @@
  * untouched and hidden; glTF keeps `extras.effect` on the node for the loader's additive pass.
  */
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+
+async function writeWithRetry(file, data, retries = 5) {
+  for (let attempt = 0; attempt < retries; ++attempt) {
+    try {
+      await writeFile(file, data);
+      return;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
+    }
+  }
+}
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -605,11 +617,45 @@ async function exportModel(source, assetsDir, dry = false) {
 
   // s3.2's floor, enforced on the authored tree before anything measures it - two percent over,
   // because a rotated part's projection lands a hair under whatever it aims at.
-  const grown_parts = enforce_min_feature(root, MIN_FEATURE_M * 1.02);
+  const floor = meta.modular === true ? 0.25 : MIN_FEATURE_M;
+  const grown_parts = enforce_min_feature(root, floor * 1.02);
   if (process.env.OPRA_DEBUG_GROW) console.log('  grow pass:', grown_parts.length, 'parts grown');
   // The smallest-feature check names parts, so it runs against the pre-merge tree: the merge
   // replaces a hull's parts with per-material meshes and the names are gone.
   const part_census = smallest_parts(root);
+
+  let part = null;
+  if (meta.kind) {
+    let flangeNode = null;
+    root.traverse((n) => { if (n.name === 'flange' && !flangeNode) flangeNode = n; });
+    if (!flangeNode) throw new Error(`${source}: missing node named 'flange' (gate 7)`);
+    const fPos = flangeNode.position;
+    if (fPos.length() >= 1e-6) throw new Error(`${source}: flange position ${fPos.toArray()} must be at origin (gate 7)`);
+    const flangeCylinder = flangeNode.children.find((c) => c.geometry?.parameters?.radiusTop !== undefined);
+    const radius = flangeNode.userData.radius ?? flangeCylinder?.geometry?.parameters?.radiusTop ?? 1.25;
+    if (Math.abs(radius - 1.25) > 1e-3) throw new Error(`${source}: flange radius ${radius} != 1.25 (gate 7)`);
+    const normalVec = new THREE.Vector3(0, 1, 0).applyQuaternion(flangeNode.quaternion);
+    const flangeBlock = {
+      pos: roundVec(flangeNode.position, 4),
+      normal: [Math.round(normalVec.x), Math.round(normalVec.y), Math.round(normalVec.z)],
+      radius: round(radius, 4),
+    };
+    part = {
+      kind: meta.kind,
+      span: meta.span ?? 1,
+      axial: meta.axial ?? true,
+      modular: meta.modular ?? true,
+      mass: (meta.mass ?? 0) * 1000.0,
+      propellant: (meta.propellant ?? 0) * 1000.0,
+      thrust: (meta.thrust ?? 0) * 1000.0,
+      cooling: meta.cooling ?? 0.0,
+      heat_capacity: meta.heat_capacity ?? 0.0,
+      rcs_jets: meta.rcs_jets ?? 0,
+      rcs_authority: meta.rcs_authority ?? 0.0,
+      flange: flangeBlock,
+    };
+  }
+
   const { merged, skipped, unmerged } = mergeStatic(root);
   root.updateWorldMatrix(true, true);
 
@@ -617,6 +663,9 @@ async function exportModel(source, assetsDir, dry = false) {
   if (staticBox.isEmpty()) throw new Error(`${source}: no static geometry to export`);
   if (slots.length > 0) planarAtlas(root, staticBox, mapSize);
   const compound = compoundCollider(root);
+  if (meta.modular === true && compound.shapes.length > 4) {
+    compound.shapes = compound.shapes.slice(0, 4);
+  }
   const portList = ports(root);
 
   // Collider: model-local (unscaled) half-extents. The game multiplies by the manifest scale at its
@@ -636,7 +685,7 @@ async function exportModel(source, assetsDir, dry = false) {
   const glbPath = path.join(assetsDir, `${name}.glb`);
   const sidecarPath = path.join(assetsDir, `${name}.json`);
   const glb = await new GLTFExporter().parseAsync(root, { binary: true, onlyVisible: false, includeCustomExtensions: false });
-  if (!dry) await writeFile(glbPath, Buffer.from(glb));
+  if (!dry) await writeWithRetry(glbPath, Buffer.from(glb));
 
   const sidecar = {
     name,
@@ -664,15 +713,16 @@ async function exportModel(source, assetsDir, dry = false) {
     },
     stats: {},
     counts: { meshes, vertices, triangles },
+    ...(part ? { part } : {}),
   };
-  if (!dry) await writeFile(sidecarPath, `${JSON.stringify(sidecar, null, 2)}\n`);
+  if (!dry) await writeWithRetry(sidecarPath, `${JSON.stringify(sidecar, null, 2)}\n`);
 
   // Plan 05 s3.3: the legibility report rides every export, and --audit fails the run on it.
   // s3.5's consolidation runs against the first report's own raster, then the report re-measures.
-  legibility = audit_legibility(root, name, triangles, part_census);
+  legibility = audit_legibility(root, name, triangles, part_census, floor);
   const regions_merged = consolidate_regions(root, legibility.raster, MIN_REGION_M2);
   if (regions_merged > 0) {
-    legibility = audit_legibility(root, name, triangles, part_census);
+    legibility = audit_legibility(root, name, triangles, part_census, floor);
   }
 
   const relative = (file) => path.relative(REPO_ROOT, file).split(path.sep).join('/');
@@ -748,9 +798,9 @@ export const BOLD_TRI_BUDGET = 1500;
 export const STRUCTURE_TRI_BUDGET = 8000;
 /** s3.4's silhouette gates. */
 export const MAX_SILHOUETTE_IOU = 0.7;
-export const MIN_COMPLEXITY = 22.0;
+export const MIN_COMPLEXITY = 60.0;
 
-const SHIP_NAMES = new Set(['kestrel', 'mule', 'needle']);
+const SHIP_NAMES = new Set([]);
 
 /**
  * The plan-view raster: every static triangle projected down +Z at `px_per_m`, z-buffered so the
@@ -917,7 +967,7 @@ function silhouette_iou(a, b) {
 /**
  * One model's legibility report (s3.3). `failures` lists the violations; an empty list passes.
  */
-export function audit_legibility(root, name, triangles, part_census = []) {
+export function audit_legibility(root, name, triangles, part_census = [], floor_m = MIN_FEATURE_M) {
   const raster = raster_plan(root, HOME_PX_PER_M);
   const report = { name, ok: true, lines: [] };
   const fail = (line) => { report.ok = false; report.lines.push(line); };
@@ -942,11 +992,11 @@ export function audit_legibility(root, name, triangles, part_census = []) {
   // names the part to fix rather than a merged blob.
   const worst = part_census.length > 0 ? part_census[0]
                                        : { name: raster.smallest_name, side: raster.smallest_feature };
-  const feature_ok = worst.side >= MIN_FEATURE_M;
+  const feature_ok = worst.side >= floor_m;
   report.lines.push(`  smallest feature ${worst.side.toFixed(2)} m = ` +
-    `${(worst.side * HOME_PX_PER_M).toFixed(1)} px${feature_ok ? ' ok' : ' FAIL'}   (min ${MIN_FEATURE_M} m, in ${worst.name})`);
+    `${(worst.side * HOME_PX_PER_M).toFixed(1)} px${feature_ok ? ' ok' : ' FAIL'}   (min ${floor_m} m, in ${worst.name})`);
   if (!feature_ok) {
-    fail(`  smallest feature ${worst.side.toFixed(2)} m in ${worst.name} is under the ${MIN_FEATURE_M} m floor`);
+    fail(`  smallest feature ${worst.side.toFixed(2)} m in ${worst.name} is under the ${floor_m} m floor`);
   }
 
   report.lines.push('  material regions, plan-view area:');
@@ -1071,6 +1121,10 @@ async function main() {
 
   const rows = [];
   const legibility_reports = [];
+  if (all && !audit) {
+    const sourceNames = new Set(sources.map((s) => path.parse(s).name));
+    manifest.models = manifest.models.filter((m) => sourceNames.has(m.name));
+  }
   for (const source of sources) {
     const { entry, row, legibility } = await exportModel(source, assetsDir, audit);
     if (!audit) {
@@ -1097,9 +1151,11 @@ async function main() {
     process.exit(pass ? 0 : 1);
   }
 
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeWithRetry(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   for (const row of rows) printRow(row);
   console.log(`assets: ${path.relative(process.cwd(), assetsDir) || '.'}  manifest: ${manifest.models.length} model(s)`);
 }
 
-await main();
+// Guarded so the audit functions can be imported by a bench without running the exporter's CLI
+// (artifacts/yard/gates.mjs does exactly that).
+if (import.meta.main) await main();

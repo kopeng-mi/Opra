@@ -4,31 +4,43 @@
 // action is consumed by exactly one screen, and the table says which (plan 5.1).
 //
 // Two tables and not one, because there are two kinds of edge and conflating them is how a key
-// starts meaning something no one bound: FLOW is key-driven (M, N, H, Esc, F2), MENU_FLOW is the
+// starts meaning something no one bound: FLOW is key-driven (M, N, H, Esc, F1, F2), MENU_FLOW is the
 // rows a plate or a menu offers and the pointer or the arrow keys select.
 #pragma once
+
+#include <vector>
 
 #include "game/bindings.h"
 
 namespace opra::ui {
 
 /**
- * The screens. There is no Map here: plan 05 J2 replaced it with one continuous zoom, so the
- * system is what the flight view shows when the wheel runs out. `Hangar` is not here yet: the
- * plan lists it for the refit work, and a row for a screen that cannot be reached is exactly what
- * the reachability assert exists to catch.
+ * The screens. Flow is Title -> Contract -> Shipyard -> Flight (plan 06 L1).
+ * Overlay screens push onto the stack; dismissing them pops back to whoever opened them (L2).
  */
-enum class Screen { Startup, Flight, Chart, Manual, Pause, Settings, Viewer };
+enum class Screen {
+    Startup,
+    Contract,
+    Shipyard,
+    Flight,
+    Chart,
+    Manual,
+    Pause,
+    Settings,
+    Viewer
+};
+
+enum class Mode { Replace, Push, Pop };
 
 /**
- * One key-driven edge. `on` is the action that takes you from `from` to `to`; `pushes` means `to`
- * remembers where it came from, so Back returns there rather than to Flight.
+ * One key-driven edge. `on` is the action that takes you from `from` to `to`; `mode` controls
+ * whether the target screen replaces the current, pushes onto the stack, or pops back.
  */
 struct Transition {
     Screen from;
     Action on;
     Screen to;
-    bool pushes;
+    Mode mode;
 };
 
 extern const Transition FLOW[];
@@ -39,13 +51,17 @@ extern const int FLOW_COUNT;
  * they are selected.
  */
 enum class MenuAction {
-    TitleContinue,
-    TitleNewContract,
+    TitleBegin,
     TitleSettings,
     TitleManual,
     TitleQuit,
+    ContractAccept,
+    ContractBack,
+    ShipyardLaunch,
+    ShipyardBack,
     PauseResume,
     PauseSettings,
+    PauseAbandon,
     SettingsBack,
 };
 
@@ -53,6 +69,7 @@ struct MenuTransition {
     Screen from;
     MenuAction on;
     Screen to;
+    Mode mode;
 };
 
 extern const MenuTransition MENU_FLOW[];
@@ -62,6 +79,16 @@ extern const int MENU_FLOW_COUNT;
 const char *screen_name(Screen screen);
 /** The enum value for a name, or Startup when the name is not a screen. */
 Screen screen_from_name(const char *name);
+
+const Transition *find_transition(Screen from, Action on);
+const MenuTransition *find_menu_transition(Screen from, MenuAction on);
+
+/** Stack mutations per plan 06 §2.1. Pop guards against popping the root element. */
+void apply(std::vector<Screen> &stack, const Transition &edge);
+void apply_menu(std::vector<Screen> &stack, const MenuTransition &edge);
+
+bool apply(std::vector<Screen> &stack, Action on);
+bool apply_menu(std::vector<Screen> &stack, MenuAction on);
 
 /** The screen an action leads to from `from`, or `from` itself when it leads nowhere. */
 Screen advance(Screen from, Action on);

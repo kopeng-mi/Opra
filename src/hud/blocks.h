@@ -20,6 +20,20 @@ struct BlockRect {
 };
 
 /**
+ * The block contract (plan 06 §3.6). A block that has nothing to say returns false from live()
+ * and occupies nothing.
+ */
+struct Block {
+    const char *title = "";
+    float (*measure)(const HudFrame &) = nullptr;
+    void (*build)(UIBatch &, const HudFrame &, const ui::Rect &at) = nullptr;
+    bool (*live)(const HudFrame &) = nullptr;
+};
+
+/** Fills with FIELD at α 0.72 plus a 12 px ring at α 0.36 (plan 06 §3.4). */
+void draw_scrim(UIBatch &batch, const ui::Rect &at);
+
+/**
  * One corner's column. Top corners stack downward from the safe area's top edge, bottom corners
  * upward from its bottom edge; the cursor is the whole of the state.
  */
@@ -40,15 +54,11 @@ private:
 };
 
 /**
- * The layout assertion pass (plan 5.2, F7). Three rules, all of them about the frame as drawn:
- *
+ * The layout assertion pass (plan 5.2, F7). Rules:
  *  - every block sits inside the safe area;
  *  - no two blocks overlap;
- *  - a text whose anchor falls inside a block has to fit inside it.
- *
- * The collar and the ship's own readouts are marks rather than blocks: they are centred on the ship
- * and a bearing ring that must sit on the ship cannot also respect an inset. They are exempt by
- * omission - this pass never sees them - and the exemption is the one the design asks for.
+ *  - a text whose anchor falls inside a block has to fit inside it;
+ *  - no block's rect may intersect the arc's reserved span (plan 06 §3.6).
  *
  * Returns the violation count; `log` prints each one with the block name.
  */

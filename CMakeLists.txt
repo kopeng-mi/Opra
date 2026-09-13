@@ -110,6 +110,8 @@ add_executable(Opra
     src/sim/combat_tests.cpp
     src/sim/component.cpp
     src/sim/component_tests.cpp
+    src/sim/designs.cpp
+    src/sim/design_tests.cpp
     src/sim/physics.cpp
     src/sim/program.cpp
     src/sim/shapes.cpp

@@ -267,6 +267,76 @@ void test_world_edges() {
     check(pool.size() == 0, "effects: a run reset clears the glass");
 }
 
+void test_wreckage_gates_12_13() {
+    // Gate 12: A 12-module ship blows up into 12 debris bodies and <= 72 particles; pool <= 256
+    ShipDesign kestrel;
+    kestrel.name = "Kestrel";
+    kestrel.slots = 12;
+    kestrel.pitch = 4.0;
+    kestrel.half_width = 1.6;
+    kestrel.recess = 0.0;
+    kestrel.scale = 1.0;
+    kestrel.spine.slots = 12;
+    kestrel.spine.pitch = 4.0;
+    kestrel.spine.half_width = 1.6;
+
+    const char *parts12[12] = {
+        "nose_hammerhead", "section_combat_a", "section_combat_a", "section_combat_a",
+        "section_tank_saddle", "section_machinery", "section_tank_saddle", "section_radiator_wing",
+        "section_radiator_wing", "section_machinery", "section_combat_a", "drive_twin_torch"
+    };
+    for (int i = 0; i < 12; ++i) {
+        Placement p;
+        p.part = parts12[i];
+        p.slot = i;
+        p.facing = (i == 11) ? Facing::Aft : Facing::Fore;
+        p.span = 1;
+        p.axial = true;
+        kestrel.placements.push_back(p);
+    }
+
+    PartTable part_table;
+    for (int i = 0; i < 12; ++i) {
+        PartSpec ps;
+        ps.dry_mass = 7000.0;
+        ps.heat_capacity = 10.0;
+        part_table[parts12[i]] = ps;
+    }
+
+    Effects pool(256);
+    check(pool.capacity() <= 256, "gate 12: pool capacity <= 256");
+
+    const Vec2 ship_pos{100.0, 50.0};
+    const Vec2 ship_vel{20.0, -10.0};
+    const Real ship_angle = 0.45;
+    const Real ship_omega = 0.5;
+    const Real blast_energy = 1.0e8;
+    const Real born = 5.0;
+
+    const WreckageResult res = emit_wreckage(pool, kestrel, part_table, ship_pos, ship_vel,
+                                             ship_angle, ship_omega, blast_energy, born);
+
+    check(res.debris.size() == 12, "gate 12: 12-module ship blows up into 12 debris bodies");
+    check(res.particles <= 72, "gate 12: 12-module ship spawns <= 72 particles");
+    check(pool.size() <= 256, "gate 12: pool size within 256");
+
+    // Gate 13: No debris body spawns inside the collider it left
+    const Real cos_a = std::cos(ship_angle);
+    const Real sin_a = std::sin(ship_angle);
+    for (size_t i = 0; i < kestrel.placements.size(); ++i) {
+        const Placement &p = kestrel.placements[i];
+        const Real L = static_cast<Real>(kestrel.spine.slots) * kestrel.spine.pitch;
+        const Real centre_y = L * 0.5 - (static_cast<Real>(p.slot) + 0.5 * static_cast<Real>(p.span)) * kestrel.spine.pitch;
+        const Vec2 r_local{0.0, centre_y};
+        const Vec2 pos_part = {ship_pos.x + r_local.x * cos_a - r_local.y * sin_a,
+                               ship_pos.y + r_local.x * sin_a + r_local.y * cos_a};
+        const DebrisBody &db = res.debris[i];
+        const Real dist = std::hypot(db.pos.x - pos_part.x, db.pos.y - pos_part.y);
+        check(dist >= db.bounds_radius - 1e-4,
+              "gate 13: debris body spawns outside the collider it left");
+    }
+}
+
 }  // namespace
 
 int effects_tests() {
@@ -275,6 +345,7 @@ int effects_tests() {
     test_lifetime();
     test_magnitude();
     test_world_edges();
+    test_wreckage_gates_12_13();
     return selftest::failures() - before;
 }
 

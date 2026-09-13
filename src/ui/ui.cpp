@@ -20,11 +20,12 @@ uint32_t hash_id(const char *text, int index) {
 }
 
 void Context::begin(UIBatch &batch, const glm::vec2 &screen, const Pointer &pointer,
-                    const Nav &nav) {
+                    const Nav &nav, double now) {
     batch_ = &batch;
     screen_ = screen;
     pointer_ = pointer;
     nav_ = nav;
+    now_ = now;
     stack_.clear();
     order_.clear();
     hot_ = 0;
@@ -124,10 +125,16 @@ bool Context::interact(uint32_t id, const Rect &at) {
         active_ = 0;
         if (fired) {
             focus_ = id;
+            last_fired_ = id;
+            last_fired_at_ = now_;
             return true;
         }
     }
-    if (focus_ == id && nav_.activate) return true;
+    if (focus_ == id && nav_.activate) {
+        last_fired_ = id;
+        last_fired_at_ = now_;
+        return true;
+    }
     return false;
 }
 
@@ -151,15 +158,41 @@ void Context::section(const Rect &at, const char *text) {
 bool Context::button(const char *id, const Rect &at, const char *label_text, int index) {
     const uint32_t widget = hash_id(id, index);
     const bool fired = interact(widget, at);
-    const bool bright = lit(widget, at);
-    const glm::vec4 color = bright ? ui::tokens::ETCH : ui::tokens::ETCH_DIM;
+    const bool inside = pointer_.valid && at.contains(pointer_.at);
+    const bool is_active = (active_ == widget);
+    const bool is_hover = inside && !is_active;
+
+    glm::vec4 color = tokens::ETCH_DIM;
+    glm::vec4 rule_color = with_alpha(tokens::ETCH_DIM, 0.28f);
+
+    if (is_active) {
+        color = tokens::DRIVE;
+        rule_color = tokens::DRIVE;
+    } else if (is_hover) {
+        color = tokens::ETCH;
+        rule_color = with_alpha(tokens::ETCH, 0.85f);
+    }
+
+    if (last_fired_ == widget && (now_ - last_fired_at_) < 0.06) {
+        const float flash = clamp01(1.0f - static_cast<float>((now_ - last_fired_at_) / 0.06));
+        color = lerp_color(color, glm::vec4(1.0f), flash);
+    }
+
     if (batch_) {
         if (focused(id, index) && keyboard_) {
-            push_rect(*batch_, {at.x - 14.0f, at.y + 4.0f}, {3.0f, at.h - 8.0f}, ui::tokens::NAV);
+            push_rect(*batch_, {at.x - 14.0f, at.y + 4.0f}, {3.0f, at.h - 8.0f}, tokens::NAV);
+        }
+        if (is_active) {
+            push_rect(*batch_, {at.x - 4.0f, at.y + 2.0f}, {2.0f, at.h - 4.0f}, tokens::DRIVE);
+        } else if (is_hover) {
+            push_rect(*batch_, {at.x, at.y}, {6.0f, 1.0f}, with_alpha(tokens::ETCH, 0.85f));
+            push_rect(*batch_, {at.x, at.y}, {1.0f, 6.0f}, with_alpha(tokens::ETCH, 0.85f));
+            push_rect(*batch_, {at.x, at.y + at.h - 1.0f}, {6.0f, 1.0f}, with_alpha(tokens::ETCH, 0.85f));
+            push_rect(*batch_, {at.x, at.y + at.h - 6.0f}, {1.0f, 6.0f}, with_alpha(tokens::ETCH, 0.85f));
         }
         push_text(*batch_, label_text, 19.0f, {at.x, at.y + (at.h - 19.0f) * 0.5f}, TextAlign::Left,
                   color);
-        rule(at, bright ? ui::tokens::ETCH : with_alpha(ui::tokens::ETCH_DIM, 0.5f));
+        rule(at, rule_color);
     }
     order_.push_back(widget);
     return fired;
@@ -169,11 +202,33 @@ bool Context::row(const char *id, const Rect &at, const char *label_text, int in
                   const glm::vec4 &ink) {
     const uint32_t widget = hash_id(id, index);
     const bool fired = interact(widget, at);
-    const bool bright = lit(widget, at);
-    const glm::vec4 color = bright ? ink : with_alpha(ink, tokens::DORMANT);
+    const bool inside = pointer_.valid && at.contains(pointer_.at);
+    const bool is_active = (active_ == widget);
+    const bool is_hover = inside && !is_active;
+
+    glm::vec4 color = with_alpha(ink, tokens::DORMANT);
+    if (is_active) {
+        color = tokens::DRIVE;
+    } else if (is_hover) {
+        color = with_alpha(ink, 1.0f);
+    }
+
+    if (last_fired_ == widget && (now_ - last_fired_at_) < 0.06) {
+        const float flash = clamp01(1.0f - static_cast<float>((now_ - last_fired_at_) / 0.06));
+        color = lerp_color(color, glm::vec4(1.0f), flash);
+    }
+
     if (batch_) {
         if (focused(id, index) && keyboard_) {
-            push_rect(*batch_, {at.x - 14.0f, at.y + 4.0f}, {3.0f, at.h - 8.0f}, ui::tokens::NAV);
+            push_rect(*batch_, {at.x - 14.0f, at.y + 4.0f}, {3.0f, at.h - 8.0f}, tokens::NAV);
+        }
+        if (is_active) {
+            push_rect(*batch_, {at.x - 4.0f, at.y + 2.0f}, {2.0f, at.h - 4.0f}, tokens::DRIVE);
+        } else if (is_hover) {
+            push_rect(*batch_, {at.x, at.y}, {6.0f, 1.0f}, with_alpha(ink, 0.85f));
+            push_rect(*batch_, {at.x, at.y}, {1.0f, 6.0f}, with_alpha(ink, 0.85f));
+            push_rect(*batch_, {at.x, at.y + at.h - 1.0f}, {6.0f, 1.0f}, with_alpha(ink, 0.85f));
+            push_rect(*batch_, {at.x, at.y + at.h - 6.0f}, {1.0f, 6.0f}, with_alpha(ink, 0.85f));
         }
         push_text(*batch_, label_text, 19.0f, {at.x, at.y + (at.h - 19.0f) * 0.5f}, TextAlign::Left,
                   color);
@@ -183,7 +238,24 @@ bool Context::row(const char *id, const Rect &at, const char *label_text, int in
 }
 
 void Context::panel(const Rect &at, const glm::vec4 &color) {
-    if (batch_) push_rect(*batch_, {at.x, at.y}, {at.w, at.h}, color);
+    if (!batch_) return;
+    push_rect(*batch_, {at.x, at.y}, {at.w, at.h}, color);
+
+    const float alpha_mod = 0.96f + 0.04f * std::sin(2.4f * static_cast<float>(now_));
+    const glm::vec4 border_color = with_alpha(tokens::ETCH_DIM, 0.28f * alpha_mod);
+    push_rect(*batch_, {at.x, at.y}, {at.w, 1.0f}, border_color);
+    push_rect(*batch_, {at.x, at.y + at.h - 1.0f}, {at.w, 1.0f}, border_color);
+    push_rect(*batch_, {at.x, at.y}, {1.0f, at.h}, border_color);
+    push_rect(*batch_, {at.x + at.w - 1.0f, at.y}, {1.0f, at.h}, border_color);
+
+    if (std::abs(color.r - tokens::FIELD.r) < 0.05f &&
+        std::abs(color.g - tokens::FIELD.g) < 0.05f &&
+        std::abs(color.b - tokens::FIELD.b) < 0.05f) {
+        const glm::vec4 scanline_col{1.0f, 1.0f, 1.0f, 0.03f};
+        for (float y = at.y; y < at.y + at.h; y += 3.0f) {
+            push_rect(*batch_, {at.x, y}, {at.w, 1.0f}, scanline_col);
+        }
+    }
 }
 
 bool Context::toggle(const char *id, const Rect &at, const char *label_text, bool &value,
@@ -191,12 +263,31 @@ bool Context::toggle(const char *id, const Rect &at, const char *label_text, boo
     const uint32_t widget = hash_id(id, index);
     const bool fired = interact(widget, at);
     if (fired) value = !value;
-    const bool bright = lit(widget, at);
+    const bool inside = pointer_.valid && at.contains(pointer_.at);
+    const bool is_active = (active_ == widget);
+    const bool is_hover = inside && !is_active;
+
+    glm::vec4 color = tokens::ETCH_DIM;
+    if (is_active) color = tokens::DRIVE;
+    else if (is_hover) color = tokens::ETCH;
+
+    if (last_fired_ == widget && (now_ - last_fired_at_) < 0.06) {
+        const float flash = clamp01(1.0f - static_cast<float>((now_ - last_fired_at_) / 0.06));
+        color = lerp_color(color, glm::vec4(1.0f), flash);
+    }
+
     if (batch_) {
         if (focused(id, index) && keyboard_) {
-            push_rect(*batch_, {at.x - 14.0f, at.y + 4.0f}, {3.0f, at.h - 8.0f}, ui::tokens::NAV);
+            push_rect(*batch_, {at.x - 14.0f, at.y + 4.0f}, {3.0f, at.h - 8.0f}, tokens::NAV);
         }
-        const glm::vec4 color = bright ? ui::tokens::ETCH : ui::tokens::ETCH_DIM;
+        if (is_active) {
+            push_rect(*batch_, {at.x - 4.0f, at.y + 2.0f}, {2.0f, at.h - 4.0f}, tokens::DRIVE);
+        } else if (is_hover) {
+            push_rect(*batch_, {at.x, at.y}, {6.0f, 1.0f}, with_alpha(tokens::ETCH, 0.85f));
+            push_rect(*batch_, {at.x, at.y}, {1.0f, 6.0f}, with_alpha(tokens::ETCH, 0.85f));
+            push_rect(*batch_, {at.x, at.y + at.h - 1.0f}, {6.0f, 1.0f}, with_alpha(tokens::ETCH, 0.85f));
+            push_rect(*batch_, {at.x, at.y + at.h - 6.0f}, {1.0f, 6.0f}, with_alpha(tokens::ETCH, 0.85f));
+        }
         push_text(*batch_, label_text, 17.0f, {at.x, at.y + (at.h - 17.0f) * 0.5f}, TextAlign::Left,
                   color);
         // The mark: a box that fills when set, never a switch graphic.

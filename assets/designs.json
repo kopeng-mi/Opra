@@ -1,0 +1,85 @@
+{
+  "designs": [
+    {
+      "name": "Kestrel",
+      "role": "Independent corvette",
+      "class": "kestrel",
+      "slots": 12,
+      "pitch": 4.0,
+      "half_width": 1.6,
+      "recess": 0.0,
+      "scale": 1.0,
+      "cargo": 120,
+      "scan_scale": 1.0,
+      "collect_scale": 1.0,
+      "placements": [
+        { "part": "nose_hammerhead", "slot": 0, "facing": "fore" },
+        { "part": "section_combat_a", "slot": 1, "facing": "fore" },
+        { "part": "section_combat_a", "slot": 2, "facing": "fore" },
+        { "part": "section_combat_a", "slot": 3, "facing": "fore" },
+        { "part": "section_tank_saddle", "slot": 4, "facing": "fore" },
+        { "part": "section_machinery", "slot": 5, "facing": "fore" },
+        { "part": "section_tank_saddle", "slot": 6, "facing": "fore" },
+        { "part": "section_radiator_wing", "slot": 7, "facing": "fore" },
+        { "part": "section_radiator_wing", "slot": 8, "facing": "fore" },
+        { "part": "section_machinery", "slot": 9, "facing": "fore" },
+        { "part": "section_combat_a", "slot": 10, "facing": "fore" },
+        { "part": "drive_twin_torch", "slot": 11, "facing": "aft" }
+      ]
+    },
+    {
+      "name": "Mule",
+      "role": "Heavy salvage tug",
+      "class": "mule",
+      "slots": 14,
+      "pitch": 4.0,
+      "half_width": 2.4,
+      "recess": 0.0,
+      "scale": 1.0,
+      "cargo": 320,
+      "scan_scale": 1.0,
+      "collect_scale": 1.0,
+      "placements": [
+        { "part": "nose_pushbow", "slot": 0, "facing": "fore" },
+        { "part": "section_freight", "slot": 1, "facing": "fore" },
+        { "part": "section_freight", "slot": 2, "facing": "fore" },
+        { "part": "section_freight", "slot": 3, "facing": "fore" },
+        { "part": "section_freight", "slot": 4, "facing": "fore" },
+        { "part": "section_freight", "slot": 5, "facing": "fore" },
+        { "part": "section_reactor", "slot": 6, "facing": "fore" },
+        { "part": "section_reactor", "slot": 7, "facing": "fore" },
+        { "part": "section_reactor", "slot": 8, "facing": "fore" },
+        { "part": "section_machinery", "slot": 9, "facing": "fore" },
+        { "part": "section_machinery", "slot": 10, "facing": "fore" },
+        { "part": "section_machinery", "slot": 11, "facing": "fore" },
+        { "part": "section_radiator_wing", "slot": 12, "facing": "fore" },
+        { "part": "drive_quad_block", "slot": 13, "facing": "aft" }
+      ]
+    },
+    {
+      "name": "Needle",
+      "role": "Fast reconnaissance cutter",
+      "class": "needle",
+      "slots": 10,
+      "pitch": 4.0,
+      "half_width": 1.6,
+      "recess": 0.0,
+      "scale": 1.0,
+      "cargo": 40,
+      "scan_scale": 1.0,
+      "collect_scale": 1.0,
+      "placements": [
+        { "part": "nose_stealth_needle", "slot": 0, "facing": "fore" },
+        { "part": "section_delta_fore", "slot": 1, "facing": "fore" },
+        { "part": "section_delta_fore", "slot": 2, "facing": "fore" },
+        { "part": "tank_drum_1", "slot": 3, "facing": "fore" },
+        { "part": "section_stealth_combat", "slot": 4, "facing": "fore" },
+        { "part": "tank_drum_1", "slot": 5, "facing": "fore" },
+        { "part": "section_stealth_combat", "slot": 6, "facing": "fore" },
+        { "part": "section_delta_aft", "slot": 7, "facing": "fore" },
+        { "part": "section_delta_aft", "slot": 8, "facing": "fore" },
+        { "part": "drive_stealth_twin", "slot": 9, "facing": "aft" }
+      ]
+    }
+  ]
+}

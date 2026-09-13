@@ -5,49 +5,61 @@
 namespace opra::ui {
 
 /**
- * The whole flow. Reading down the table is reading the game: Esc always goes back, the two
- * instruments (chart, manual) each open from Flight and close onto it, and the viewer closes on
- * its own key as well. There is no map screen to open: the flight view is the map (plan 05 J2).
- *
- * Two rules the tests enforce: no action appears twice for one screen, and every screen has a path
- * back to Flight. Both are easy to break by hand and impossible to break quietly here.
+ * The whole flow (plan 06 §2.2). Reading down the table is reading the run:
+ * Startup -> Contract -> Shipyard -> Flight (L1).
+ * Instruments push onto the stack; dismissing them pops back to whoever opened them (L2, T-1).
  */
 const Transition FLOW[] = {
-    // Flight. Every instrument opens here and every one of them closes onto Flight.
-    {Screen::Flight, Action::Chart, Screen::Chart, false},
-    {Screen::Flight, Action::Manual, Screen::Manual, false},
-    {Screen::Flight, Action::Pause, Screen::Pause, false},
-    {Screen::Flight, Action::ModelViewer, Screen::Viewer, false},
+    // Startup. Manual and settings push onto Startup and return to it.
+    {Screen::Startup, Action::Manual, Screen::Manual, Mode::Push},
+    {Screen::Startup, Action::Settings, Screen::Settings, Mode::Push},
+
+    // Contract and Shipyard. Esc returns to the previous step.
+    {Screen::Contract, Action::Pause, Screen::Startup, Mode::Pop},
+    {Screen::Shipyard, Action::Pause, Screen::Contract, Mode::Pop},
+
+    // Flight. Every instrument opens here and returns on dismiss.
+    {Screen::Flight, Action::Chart, Screen::Chart, Mode::Push},
+    {Screen::Flight, Action::Manual, Screen::Manual, Mode::Push},
+    {Screen::Flight, Action::Pause, Screen::Pause, Mode::Push},
+    {Screen::Flight, Action::ModelViewer, Screen::Viewer, Mode::Push},
 
     // The instruments close on Esc and on their own key.
-    {Screen::Chart, Action::Pause, Screen::Flight, false},
-    {Screen::Chart, Action::Chart, Screen::Flight, false},
-    {Screen::Manual, Action::Pause, Screen::Flight, false},
-    {Screen::Manual, Action::Manual, Screen::Flight, false},
-    {Screen::Viewer, Action::Pause, Screen::Flight, false},
-    {Screen::Viewer, Action::ModelViewer, Screen::Flight, false},
+    {Screen::Chart, Action::Pause, Screen::Flight, Mode::Pop},
+    {Screen::Chart, Action::Chart, Screen::Flight, Mode::Pop},
+    {Screen::Manual, Action::Pause, Screen::Flight, Mode::Pop},
+    {Screen::Manual, Action::Manual, Screen::Flight, Mode::Pop},
+    {Screen::Viewer, Action::Pause, Screen::Flight, Mode::Pop},
+    {Screen::Viewer, Action::ModelViewer, Screen::Flight, Mode::Pop},
 
-    // The pause screen resumes on Esc.
-    {Screen::Pause, Action::Pause, Screen::Flight, false},
-    {Screen::Settings, Action::Pause, Screen::Pause, false},
+    // The pause and settings screens pop back on Esc.
+    {Screen::Pause, Action::Pause, Screen::Flight, Mode::Pop},
+    {Screen::Settings, Action::Pause, Screen::Pause, Mode::Pop},
+    {Screen::Settings, Action::Settings, Screen::Pause, Mode::Pop},
 };
 
 const int FLOW_COUNT = static_cast<int>(sizeof(FLOW) / sizeof(FLOW[0]));
 
 /**
- * The rows. The plate's five entries are the title's own list (ui/title.h prints them), the pause
- * screen's two are its own, and the settings screen's is its Back row. No key is invented here: the
- * plate's rows are chosen, not bound.
+ * The rows. Startup offers begin / settings / manual / quit.
+ * Contract offers accept / back.
+ * Shipyard offers launch / back.
+ * Pause offers resume / settings / abandon.
+ * Settings offers back.
  */
 const MenuTransition MENU_FLOW[] = {
-    {Screen::Startup, MenuAction::TitleContinue, Screen::Flight},
-    {Screen::Startup, MenuAction::TitleNewContract, Screen::Flight},
-    {Screen::Startup, MenuAction::TitleSettings, Screen::Settings},
-    {Screen::Startup, MenuAction::TitleManual, Screen::Manual},
-    {Screen::Startup, MenuAction::TitleQuit, Screen::Startup},  // the loop reads the row and quits
-    {Screen::Pause, MenuAction::PauseResume, Screen::Flight},
-    {Screen::Pause, MenuAction::PauseSettings, Screen::Settings},
-    {Screen::Settings, MenuAction::SettingsBack, Screen::Pause},
+    {Screen::Startup, MenuAction::TitleBegin, Screen::Contract, Mode::Replace},
+    {Screen::Startup, MenuAction::TitleSettings, Screen::Settings, Mode::Push},
+    {Screen::Startup, MenuAction::TitleManual, Screen::Manual, Mode::Push},
+    {Screen::Startup, MenuAction::TitleQuit, Screen::Startup, Mode::Replace},  // loop quits
+    {Screen::Contract, MenuAction::ContractAccept, Screen::Shipyard, Mode::Replace},
+    {Screen::Contract, MenuAction::ContractBack, Screen::Startup, Mode::Replace},
+    {Screen::Shipyard, MenuAction::ShipyardLaunch, Screen::Flight, Mode::Replace},
+    {Screen::Shipyard, MenuAction::ShipyardBack, Screen::Contract, Mode::Replace},
+    {Screen::Pause, MenuAction::PauseResume, Screen::Flight, Mode::Pop},
+    {Screen::Pause, MenuAction::PauseSettings, Screen::Settings, Mode::Push},
+    {Screen::Pause, MenuAction::PauseAbandon, Screen::Startup, Mode::Replace},
+    {Screen::Settings, MenuAction::SettingsBack, Screen::Pause, Mode::Pop},
 };
 
 const int MENU_FLOW_COUNT = static_cast<int>(sizeof(MENU_FLOW) / sizeof(MENU_FLOW[0]));
@@ -55,6 +67,8 @@ const int MENU_FLOW_COUNT = static_cast<int>(sizeof(MENU_FLOW) / sizeof(MENU_FLO
 const char *screen_name(Screen screen) {
     switch (screen) {
         case Screen::Startup: return "startup";
+        case Screen::Contract: return "contract";
+        case Screen::Shipyard: return "shipyard";
         case Screen::Flight: return "flight";
         case Screen::Chart: return "chart";
         case Screen::Manual: return "manual";
@@ -67,34 +81,97 @@ const char *screen_name(Screen screen) {
 
 Screen screen_from_name(const char *name) {
     for (Screen screen :
-         {Screen::Startup, Screen::Flight, Screen::Chart, Screen::Manual, Screen::Pause,
-          Screen::Settings, Screen::Viewer}) {
+         {Screen::Startup, Screen::Contract, Screen::Shipyard, Screen::Flight,
+          Screen::Chart, Screen::Manual, Screen::Pause, Screen::Settings, Screen::Viewer}) {
         if (std::strcmp(screen_name(screen), name) == 0) return screen;
     }
     return Screen::Startup;
 }
 
-Screen advance(Screen from, Action on) {
+const Transition *find_transition(Screen from, Action on) {
     for (int i = 0; i < FLOW_COUNT; ++i) {
-        const Transition &edge = FLOW[i];
-        if (edge.from == from && edge.on == on) return edge.to;
+        if (FLOW[i].from == from && FLOW[i].on == on) return &FLOW[i];
     }
-    return from;
+    return nullptr;
+}
+
+const MenuTransition *find_menu_transition(Screen from, MenuAction on) {
+    for (int i = 0; i < MENU_FLOW_COUNT; ++i) {
+        if (MENU_FLOW[i].from == from && MENU_FLOW[i].on == on) return &MENU_FLOW[i];
+    }
+    return nullptr;
+}
+
+void apply(std::vector<Screen> &stack, const Transition &edge) {
+    if (edge.mode == Mode::Replace) {
+        if (!stack.empty()) stack.back() = edge.to;
+        else stack.push_back(edge.to);
+    } else if (edge.mode == Mode::Push) {
+        stack.push_back(edge.to);
+    } else if (edge.mode == Mode::Pop) {
+        if (stack.size() > 1) {
+            stack.pop_back();
+        } else if (!stack.empty() && edge.to != Screen::Startup) {
+            stack.back() = edge.to;
+        }
+    }
+}
+
+void apply_menu(std::vector<Screen> &stack, const MenuTransition &edge) {
+    if (edge.on == MenuAction::PauseAbandon) {
+        stack.clear();
+        stack.push_back(Screen::Startup);
+        return;
+    }
+    if (edge.mode == Mode::Replace) {
+        if (!stack.empty()) stack.back() = edge.to;
+        else stack.push_back(edge.to);
+    } else if (edge.mode == Mode::Push) {
+        stack.push_back(edge.to);
+    } else if (edge.mode == Mode::Pop) {
+        if (stack.size() > 1) {
+            stack.pop_back();
+        } else if (!stack.empty() && edge.to != Screen::Startup) {
+            stack.back() = edge.to;
+        }
+    }
+}
+
+bool apply(std::vector<Screen> &stack, Action on) {
+    if (stack.empty()) stack.push_back(Screen::Startup);
+    const Transition *edge = find_transition(stack.back(), on);
+    if (!edge) return false;
+    apply(stack, *edge);
+    return true;
+}
+
+bool apply_menu(std::vector<Screen> &stack, MenuAction on) {
+    if (on == MenuAction::PauseAbandon) {
+        stack.clear();
+        stack.push_back(Screen::Startup);
+        return true;
+    }
+    if (stack.empty()) stack.push_back(Screen::Startup);
+    const MenuTransition *edge = find_menu_transition(stack.back(), on);
+    if (!edge) return false;
+    apply_menu(stack, *edge);
+    return true;
+}
+
+Screen advance(Screen from, Action on) {
+    const Transition *edge = find_transition(from, on);
+    if (!edge) return from;
+    return edge->to;
 }
 
 bool handles(Screen from, Action on) {
-    for (int i = 0; i < FLOW_COUNT; ++i) {
-        if (FLOW[i].from == from && FLOW[i].on == on) return true;
-    }
-    return false;
+    return find_transition(from, on) != nullptr;
 }
 
 Screen advance_menu(Screen from, MenuAction on) {
-    for (int i = 0; i < MENU_FLOW_COUNT; ++i) {
-        const MenuTransition &edge = MENU_FLOW[i];
-        if (edge.from == from && edge.on == on) return edge.to;
-    }
-    return from;
+    const MenuTransition *edge = find_menu_transition(from, on);
+    if (!edge) return from;
+    return edge->to;
 }
 
 }  // namespace opra::ui

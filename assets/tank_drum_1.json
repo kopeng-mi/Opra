@@ -1,0 +1,128 @@
+{
+  "name": "tank_drum_1",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -1.8864,
+      -0.3251,
+      -1.6256
+    ],
+    "max": [
+      3.0256,
+      4.3251,
+      1.6256
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -1.8864,
+      -0.3251,
+      -1.6256
+    ],
+    "max": [
+      3.0256,
+      4.3251,
+      1.6256
+    ]
+  },
+  "collider": {
+    "halfLength": 2.325,
+    "halfWidth": 2.456,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          1.1691,
+          1.7
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          1.4,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          1.6256,
+          0.9
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          1.38,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          0.8128,
+          1.2
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          4
+        ],
+        "angle": 0,
+        "half": [
+          1.25,
+          0.3251
+        ]
+      }
+    ],
+    "bounds_radius": 5.2916
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "tank_drum_1_normal",
+      "roughness": "tank_drum_1_roughness",
+      "albedo": "tank_drum_1_albedo"
+    },
+    "materials": 4
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 5,
+    "vertices": 2052,
+    "triangles": 684
+  },
+  "part": {
+    "kind": "tank",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 1500,
+    "propellant": 5000,
+    "thrust": 0,
+    "cooling": 0,
+    "heat_capacity": 3,
+    "rcs_jets": 0,
+    "rcs_authority": 0,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

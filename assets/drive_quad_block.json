@@ -1,0 +1,161 @@
+{
+  "name": "drive_quad_block",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.1,
+      -0.3251,
+      -1.72
+    ],
+    "max": [
+      2.1,
+      4.4309,
+      2.0232
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -2.1,
+      -0.3251,
+      -1.72
+    ],
+    "max": [
+      2.1,
+      8.94,
+      2.0232
+    ]
+  },
+  "collider": {
+    "halfLength": 2.378,
+    "halfWidth": 2.1,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2.55
+        ],
+        "angle": 0,
+        "half": [
+          2.1,
+          0.65
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.35
+        ],
+        "angle": 0,
+        "half": [
+          2.1,
+          0.575
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          1.7
+        ],
+        "angle": 0,
+        "half": [
+          1.1,
+          0.95
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -1.05,
+          2.95
+        ],
+        "angle": 0,
+        "half": [
+          0.7448,
+          1.1
+        ]
+      }
+    ],
+    "bounds_radius": 4.7483
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "flame",
+      "pos": [
+        -1.05,
+        4.14,
+        -0.78
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        1.05,
+        4.14,
+        -0.78
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        -1.05,
+        4.14,
+        0.78
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        1.05,
+        4.14,
+        0.78
+      ]
+    }
+  ],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "drive_quad_block_normal",
+      "roughness": "drive_quad_block_roughness",
+      "albedo": "drive_quad_block_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 11,
+    "vertices": 1964,
+    "triangles": 668
+  },
+  "part": {
+    "kind": "drive_fusion",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 16500,
+    "propellant": 0,
+    "thrust": 1950000,
+    "cooling": 0.0325,
+    "heat_capacity": 19,
+    "rcs_jets": 2,
+    "rcs_authority": 0.00789,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

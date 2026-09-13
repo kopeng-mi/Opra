@@ -55,6 +55,8 @@ const Binding BINDINGS[] = {
     {Action::ModelViewer, "F2", "model viewer", "the export pipeline's own screen",
      SDL_SCANCODE_F2, SDL_SCANCODE_UNKNOWN},
     {Action::Pause, "Esc", "pause", "esc resumes", SDL_SCANCODE_ESCAPE, SDL_SCANCODE_UNKNOWN},
+    {Action::Settings, "F1", "settings", "view, flight and renderer options",
+     SDL_SCANCODE_F1, SDL_SCANCODE_UNKNOWN},
     {Action::WarpUp, ">", "warp up", "above 10x the ship rides its conic: no thrust",
      SDL_SCANCODE_PERIOD, SDL_SCANCODE_UNKNOWN},
     {Action::WarpDown, "<", "warp down", "a contact, a burn or a new sphere drops it to 1x",

@@ -1,0 +1,128 @@
+{
+  "name": "section_stealth_combat",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -2.82,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      2.82,
+      3.97,
+      1.2679
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -2.82,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      2.82,
+      3.97,
+      1.2679
+    ]
+  },
+  "collider": {
+    "halfLength": 2.148,
+    "halfWidth": 2.82,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          2.2,
+          1.97
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0
+        ],
+        "angle": 0,
+        "half": [
+          1.25,
+          0.3251
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -1.32,
+          3.45
+        ],
+        "angle": 0,
+        "half": [
+          0.75,
+          0.5
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          1.32,
+          3.45
+        ],
+        "angle": 0,
+        "half": [
+          0.75,
+          0.5
+        ]
+      }
+    ],
+    "bounds_radius": 4.9532
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "section_stealth_combat_normal",
+      "roughness": "section_stealth_combat_roughness",
+      "albedo": "section_stealth_combat_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 7,
+    "vertices": 1536,
+    "triangles": 512
+  },
+  "part": {
+    "kind": "section_weapons",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 6000,
+    "propellant": 0,
+    "thrust": 0,
+    "cooling": 0,
+    "heat_capacity": 11,
+    "rcs_jets": 0,
+    "rcs_authority": 0,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

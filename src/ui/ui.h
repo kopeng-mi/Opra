@@ -25,6 +25,8 @@ struct Pointer {
     bool down = false;
     bool pressed = false;
     bool released = false;
+    bool right_down = false;
+    bool right_pressed = false;
     float wheel = 0.0f;
     bool valid = false;
 };
@@ -43,7 +45,10 @@ uint32_t hash_id(const char *text, int index = 0);
 
 class Context {
 public:
-    void begin(UIBatch &batch, const glm::vec2 &screen, const Pointer &pointer, const Nav &nav);
+    void begin(UIBatch &batch, const glm::vec2 &screen, const Pointer &pointer, const Nav &nav,
+               double now);
+    double time() const { return now_; }
+    const Pointer &pointer() const { return pointer_; }
     /** Applies pending keyboard navigation and clears the transient state. */
     void end();
 
@@ -112,6 +117,9 @@ private:
     bool keyboard_ = false;
     /** Set when the pointer presses this frame, so a held button does not keep re-latching. */
     bool pressed_this_frame_ = false;
+    double now_ = 0.0;
+    uint32_t last_fired_ = 0;
+    double last_fired_at_ = -10.0;
 };
 
 }  // namespace opra::ui

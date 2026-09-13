@@ -1,0 +1,137 @@
+{
+  "name": "drive_twin_torch",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -1.68,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      1.68,
+      4.3722,
+      1.48
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -1.68,
+      -0.3251,
+      -1.25
+    ],
+    "max": [
+      1.68,
+      10.12,
+      1.48
+    ]
+  },
+  "collider": {
+    "halfLength": 2.349,
+    "halfWidth": 1.68,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2.05
+        ],
+        "angle": 0,
+        "half": [
+          1.525,
+          0.85
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          0.83
+        ],
+        "angle": 0,
+        "half": [
+          1.5,
+          0.77
+        ]
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          0,
+          2.55
+        ],
+        "radius": 0.75
+      },
+      {
+        "kind": "circle",
+        "pos": [
+          -0.72,
+          2.55
+        ],
+        "radius": 0.78
+      }
+    ],
+    "bounds_radius": 4.7194
+  },
+  "ports": [],
+  "effects": [
+    {
+      "node": "flame",
+      "pos": [
+        -0.72,
+        4.12,
+        0
+      ]
+    },
+    {
+      "node": "flame",
+      "pos": [
+        0.72,
+        4.12,
+        0
+      ]
+    }
+  ],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "drive_twin_torch_normal",
+      "roughness": "drive_twin_torch_roughness",
+      "albedo": "drive_twin_torch_albedo"
+    },
+    "materials": 6
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 9,
+    "vertices": 1900,
+    "triangles": 640
+  },
+  "part": {
+    "kind": "drive_fusion",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 11500,
+    "propellant": 0,
+    "thrust": 1600000,
+    "cooling": 0,
+    "heat_capacity": 6,
+    "rcs_jets": 2,
+    "rcs_authority": 0.01534,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

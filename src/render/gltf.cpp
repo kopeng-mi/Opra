@@ -407,6 +407,34 @@ ModelMeta load_sidecar(const std::string &path) {
                                                        pos[2].get<float>()));
         }
     }
+    if (sidecar.contains("part")) {
+        const json &p = sidecar["part"];
+        ModelPart mp;
+        mp.kind = p.value("kind", std::string{});
+        mp.span = p.value("span", 1);
+        mp.axial = p.value("axial", true);
+        mp.modular = p.value("modular", true);
+        mp.mass = p.value("mass", 0.0);
+        mp.propellant = p.value("propellant", 0.0);
+        mp.thrust = p.value("thrust", 0.0);
+        mp.cooling = p.value("cooling", 0.0);
+        mp.heat_capacity = p.value("heat_capacity", 0.0);
+        mp.rcs_jets = p.value("rcs_jets", 0);
+        mp.rcs_authority = p.value("rcs_authority", 0.0);
+        if (p.contains("flange")) {
+            const json &f = p["flange"];
+            if (f.contains("pos")) {
+                const json &fpos = f["pos"];
+                mp.flange_pos = {fpos[0].get<float>(), fpos[1].get<float>(), fpos[2].get<float>()};
+            }
+            if (f.contains("normal")) {
+                const json &fnorm = f["normal"];
+                mp.flange_normal = {fnorm[0].get<float>(), fnorm[1].get<float>(), fnorm[2].get<float>()};
+            }
+            mp.flange_radius = f.value("radius", 1.25f);
+        }
+        meta.part = mp;
+    }
     return meta;
 }
 

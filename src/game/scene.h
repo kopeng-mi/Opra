@@ -26,6 +26,11 @@ void build_scene(SceneBuilder &scene, const ModelSet &models, const World &world
                  const Backdrop &backdrop, const Camera &camera, float screen_width,
                  float screen_height, std::unordered_map<unsigned long long, int> &lod_memory);
 
+/** Places every live placement of a design. `lod` is chosen once for the whole ship (§7.4). */
+void add_design(SceneBuilder &scene, const ModelSet &models, const ShipDesign &design,
+                const glm::vec3 &origin, const glm::quat &rotation, float scale, int lod,
+                float thrust, const std::vector<Real> &jets);
+
 /**
  * s2.5's selection: the level for an object `px` pixels across, given the level it already drew
  * at. Thresholds 8 / 60 / 250 px with a ten percent deadband - a model at the bold LOD stays

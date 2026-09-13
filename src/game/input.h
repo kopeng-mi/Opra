@@ -26,6 +26,8 @@ struct Input {
     bool pressed(SDL_Scancode key) const { return keys[key] && !previous[key]; }
     bool left_pressed() const { return left && !previous_left; }
     bool left_released() const { return !left && previous_left; }
+    bool right_pressed() const { return right && !previous_right; }
+    bool right_released() const { return !right && previous_right; }
 };
 
 /** Applies one SDL event to the input state. Returns false when the window should close. */

@@ -615,4 +615,49 @@ void World::break_rock(Obstacle &rock) {
     rock.retired = true;
 }
 
+void World::rebuild_from_design(const PartTable &parts) {
+    if (!design.placements.empty()) {
+        derived = derive_spec(design, parts);
+        derived.name = design.name.c_str();
+        derived.role = design.role.c_str();
+        ship.spec = &derived;
+        ship.fuel = derived.fuel;
+        ship.hull = derived.hull;
+        ship.cooling = derived.cooling;
+        ship.rcsJet.assign(design.placements.size(), 0.0);
+
+        const Vec2 com = centre_of_mass(design, parts);
+        const Real L = static_cast<Real>(design.spine.slots) * design.spine.pitch;
+        ship.rcsArms.resize(design.placements.size());
+        for (size_t k = 0; k < design.placements.size(); ++k) {
+            const Placement &p = design.placements[k];
+            const Real centre_y = L * 0.5 - (static_cast<Real>(p.slot) + 0.5 * static_cast<Real>(p.span)) * design.spine.pitch;
+            Real pos_x = 0.0;
+            if (!is_axial(p.facing)) {
+                pos_x = face_dir(p.facing).x * (design.spine.half_width - design.spine.recess);
+            }
+            ship.rcsArms[k] = {pos_x - com.x, centre_y - com.y};
+        }
+    } else {
+        ship.spec = &SHIPS[static_cast<int>(ship.shipClass)];
+        ship.rcsJet.assign(4, 0.0);
+        ship.rcsArms.clear();
+    }
+}
+
+void World::rebuild_from_design() {
+    if (!design.placements.empty()) {
+        derived = derive_spec(design);
+        derived.name = design.name.c_str();
+        derived.role = design.role.c_str();
+        ship.spec = &derived;
+        ship.rcsJet.assign(design.placements.size(), 0.0);
+        ship.rcsArms.clear();
+    } else {
+        ship.spec = &SHIPS[static_cast<int>(ship.shipClass)];
+        ship.rcsJet.assign(4, 0.0);
+        ship.rcsArms.clear();
+    }
+}
+
 }  // namespace opra

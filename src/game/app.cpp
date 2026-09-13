@@ -46,6 +46,51 @@ Obstacle *beam_target(World &world, const Vec2 &muzzle, const Vec2 &direction, R
     return best;
 }
 
+void App::build_part_table() {
+    part_table.clear();
+    for (const std::string &name : models.store.names()) {
+        const ModelMeta &meta = models.store.meta(name);
+        if (meta.part.has_value()) {
+            const ModelPart &mp = *meta.part;
+            PartSpec ps;
+            ps.kind = mp.kind;
+            ps.span = mp.span;
+            ps.axial = mp.axial;
+            ps.dry_mass = mp.mass;
+            ps.propellant = mp.propellant;
+            ps.thrust = mp.thrust;
+            ps.cooling = mp.cooling;
+            ps.heat_capacity = mp.heat_capacity;
+            ps.rcs_jets = mp.rcs_jets;
+            ps.rcs_authority = mp.rcs_authority;
+            part_table[name] = ps;
+        }
+    }
+}
+
+namespace {
+
+void validate_design_parts(const ShipDesign &design, const PartTable &parts) {
+    std::vector<std::string> missing;
+    for (const auto &p : design.placements) {
+        if (parts.find(p.part) == parts.end()) {
+            if (std::find(missing.begin(), missing.end(), p.part) == missing.end()) {
+                missing.push_back(p.part);
+            }
+        }
+    }
+    if (!missing.empty()) {
+        std::string msg = "Design '" + design.name + "' references missing part(s): ";
+        for (size_t i = 0; i < missing.size(); ++i) {
+            if (i > 0) msg += ", ";
+            msg += missing[i];
+        }
+        fatal(msg.c_str());
+    }
+}
+
+}  // namespace
+
 void App::init(bool hidden, bool debug_gpu) {
     debug = debug_gpu;
     settings.load();
@@ -79,6 +124,11 @@ void App::init(bool hidden, bool debug_gpu) {
                    asset_path("assets/fonts/Barlow-Regular.ttf"));
 
     models.build(asset_path("assets/models.json"));
+    build_part_table();
+    designs.load(asset_path("assets/designs.json"));
+    world.design = designs.design("Kestrel");
+    validate_design_parts(world.design, part_table);
+    world.rebuild_from_design(part_table);
     sync_ship_collider();
     sync_ports();
     // The orrery's meshes must exist before the upload: the draw table is built from the library.
@@ -111,14 +161,39 @@ void App::toast(std::string message, double duration) {
 }
 
 Camera active_camera(const App &app, Uint32 width, Uint32 height) {
-    // The plate keeps the orrery's own camera: the system seen from the pole behind the title
-    // (E12). The flight view needs no separate map camera any more - one continuous zoom (plan 05
-    // J2) means the map screen is gone and the flight camera runs from hull to system scale.
-    if (app.screen == ui::Screen::Startup) {
-        return orrery::map_camera(app.map_frame, static_cast<float>(width),
-                                  static_cast<float>(height), 0.5f);
+    // Startup diorama camera (PLAN-08 §10.2): pitch 28°, slow yaw drift, half_height 95 m,
+    // berthed ship at station Port A shifted right to clear title plate.
+    if (app.current() == ui::Screen::Startup) {
+        Camera camera;
+        const float pitch = 0.4887f; // 28 deg
+        const float yaw = app.title_yaw != 0.0f ? app.title_yaw : 0.55f;
+        const float half_height = 95.0f;
+        const float aspect = height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
+
+        camera.half_height = half_height;
+        camera.aspect = aspect;
+        camera.up = glm::vec3(0.0f, 0.0f, 1.0f);
+
+        const glm::vec3 fwd(std::cos(pitch) * std::sin(yaw),
+                            -std::cos(pitch) * std::cos(yaw),
+                            std::sin(pitch));
+        const glm::vec3 right_vec = glm::normalize(glm::cross(fwd, glm::vec3(0.0f, 0.0f, 1.0f)));
+
+        const float ship_half_len = static_cast<float>(app.world.ship.bounds.halfLength > 0 ? app.world.ship.bounds.halfLength : 24.0);
+        glm::vec3 target{100.6f + 1.2f - ship_half_len, -8.0f, 0.0f};
+
+        const float shift = 2.0f * (0.5f - 0.62f) * half_height * aspect;
+        target += right_vec * shift;
+
+        camera.target = target;
+        camera.eye = target + fwd * static_cast<float>(half_height / std::tan(static_cast<double>(CAMERA_FOV_Y) * 0.5));
+        camera.origin = target;
+        return camera;
     }
-    if (app.screen == ui::Screen::Viewer) return app.viewer.camera(app.models, width, height);
+    if (app.current() == ui::Screen::Viewer) return app.viewer.camera(app.models, width, height);
+    if (app.current() == ui::Screen::Shipyard) {
+        return ui::shipyard_camera(app.models, app.shipyard_state, width, height);
+    }
     return camera_for(app.world, width, height, app.half_height_current, app.cinematic, app.pitch,
                       app.follow.target, app.camera_look);
 }
@@ -133,6 +208,63 @@ void App::apply_settings() {
 // P4: the hull collides as the exporter's shape set, scaled into sim metres. The single box it
 // replaced (D-19) registered hits in the gaps between the Mule's chassis rails.
 void App::sync_ship_collider() {
+    if (!world.design.placements.empty()) {
+        const Real design_scale = world.design.scale;
+        Collider &collider = world.ship.collider;
+        collider.shapes.clear();
+        world.pdc_mounts.clear();
+        Real max_radius = 0.0;
+
+        for (const Placement &p : world.design.placements) {
+            if (p.destroyed) continue;
+            const ModelMeta &meta = models.store.meta(p.part);
+            const Mount m = mount_transform(world.design.spine, p);
+            const glm::dvec3 f = m.rot * glm::dvec3(0.0, 1.0, 0.0);
+            const Real yaw = (std::abs(f.x) + std::abs(f.y) < 1e-6) ? 0.0 : std::atan2(-f.x, f.y);
+            const Real cos_y = std::cos(yaw);
+            const Real sin_y = std::sin(yaw);
+            const Vec2 o = {m.pos.x * design_scale, m.pos.y * design_scale};
+
+            for (const ModelShape &shape : meta.shapes) {
+                Shape out;
+                out.kind = shape.kind == ModelShape::Kind::Circle ? Shape::Kind::Circle : Shape::Kind::Box;
+                const Vec2 local_pos = {shape.pos.x * design_scale, shape.pos.y * design_scale};
+                out.local_pos = {cos_y * local_pos.x - sin_y * local_pos.y + o.x,
+                                 sin_y * local_pos.x + cos_y * local_pos.y + o.y};
+                out.local_angle = shape.angle + yaw;
+                out.half_length = shape.half.y * design_scale;
+                out.half_width = shape.half.x * design_scale;
+                out.radius = shape.radius * design_scale;
+
+                const Real c_dist = std::hypot(out.local_pos.x, out.local_pos.y);
+                const Real shape_r = (out.kind == Shape::Kind::Box)
+                                         ? std::hypot(out.half_width, out.half_length)
+                                         : out.radius;
+                max_radius = std::max(max_radius, c_dist + shape_r);
+
+                collider.shapes.push_back(out);
+            }
+
+            for (const auto &[id, at] : meta.hardpoints) {
+                if (id.rfind("pdc.", 0) != 0) continue;
+                const Vec2 local_hp = {at.x * design_scale, at.y * design_scale};
+                const Vec2 rotated_hp = {cos_y * local_hp.x - sin_y * local_hp.y + o.x,
+                                         sin_y * local_hp.x + cos_y * local_hp.y + o.y};
+                world.pdc_mounts.push_back(rotated_hp);
+            }
+        }
+
+        if (collider.shapes.size() > 64) {
+            fatal(("Composed collider shape count " +
+                   std::to_string(collider.shapes.size()) + " exceeds 64 (gate 14)").c_str());
+        }
+
+        collider.bounds_radius = max_radius;
+        world.ship.bounds = collider_bounds(collider);
+        world.derived.length = 2.0 * world.ship.bounds.halfLength;
+        return;
+    }
+
     const ModelMeta &meta =
         models.store.meta(SHIP_MODEL_NAMES[static_cast<int>(world.ship.shipClass)]);
     const Real scale = meta.scale;
@@ -177,6 +309,41 @@ void App::sync_ports() {
         station.push_back(Port{port.id, {port.pos.x * scale, port.pos.y * scale}, port.normal,
                                port.size_class});
     }
+
+    if (!world.design.placements.empty()) {
+        std::vector<Port> ship_ports;
+        char next_port_id = 'A';
+        const Real design_scale = world.design.scale;
+        for (const Placement &p : world.design.placements) {
+            if (p.destroyed) continue;
+            const ModelMeta &meta = models.store.meta(p.part);
+            const Mount m = mount_transform(world.design.spine, p);
+            const glm::dvec3 f = m.rot * glm::dvec3(0.0, 1.0, 0.0);
+            const Real yaw = (std::abs(f.x) + std::abs(f.y) < 1e-6) ? 0.0 : std::atan2(-f.x, f.y);
+            const Real cos_y = std::cos(yaw);
+            const Real sin_y = std::sin(yaw);
+            const Vec2 o = {m.pos.x * design_scale, m.pos.y * design_scale};
+
+            for (const ModelPort &mp : meta.ports) {
+                std::string assigned_id(1, next_port_id++);
+                const Vec2 local_pos = {mp.pos.x * design_scale, mp.pos.y * design_scale};
+                const Vec2 c_prime = {cos_y * local_pos.x - sin_y * local_pos.y + o.x,
+                                      sin_y * local_pos.x + cos_y * local_pos.y + o.y};
+                const Vec2 norm_prime = {cos_y * mp.normal.x - sin_y * mp.normal.y,
+                                         sin_y * mp.normal.x + cos_y * mp.normal.y};
+                ship_ports.push_back(Port{assigned_id, c_prime, norm_prime, mp.size_class});
+            }
+        }
+        Port ship;
+        if (!ship_ports.empty()) {
+            ship = ship_ports.front();
+        } else {
+            ship = Port{"aft", {0.0, -world.ship.bounds.halfLength}, {0.0, -1.0}, 'M'};
+        }
+        world.set_ports(station, ship);
+        return;
+    }
+
     Port ship;
     const ModelMeta &ship_meta =
         models.store.meta(SHIP_MODEL_NAMES[static_cast<int>(world.ship.shipClass)]);
@@ -223,7 +390,10 @@ void App::plan_transfer() {
 }
 
 void App::reset_run() {
+    ShipDesign current_design = world.design;
     world = World{};
+    world.design = std::move(current_design);
+    world.rebuild_from_design(part_table);
     world.attach_system(system, system_anchor);
     world.ship.assist = settings.assist;
     clear_effects();
@@ -250,6 +420,8 @@ void App::reload_models_if_stale(bool force) {
     const std::string manifest = asset_path("assets/models.json");
     const int before = models.library.size();
     models.build(manifest);
+    build_part_table();
+    world.rebuild_from_design(part_table);
     upload_mesh_library(renderer, models.library);
     sync_ship_collider();
     sync_ports();

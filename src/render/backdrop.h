@@ -1,7 +1,7 @@
-// The backdrop: stars, nebula, dust and near motes, as real instanced geometry at real distances,
-// so perspective produces the parallax instead of a per-layer offset factor.
+// The backdrop: stars, dust and near motes, as real instanced geometry at real distances,
+// so perspective produces the parallax instead of a per-layer offset factor (plan 06 §5, L7).
 //
-// Stars and nebula are placed by *direction*: their anchors are pinned far out in double metres, so
+// Stars are placed by direction: their anchors are pinned far out in double metres, so
 // crossing the system turns the sky by the real angle and nothing has to be animated. Dust and
 // motes live in the local volume instead - they fold into a box around the render origin as the
 // ship travels, and they are the only layers that read as speed.
@@ -33,10 +33,9 @@ struct Backdrop {
         glm::vec3 color{1.0f};
     };
 
-    std::vector<Sky> stars;   // ~1200 points
-    std::vector<Sky> nebula;  // 4 clouds of ~42 soft glows each (S-1: no locatable edge)
-    std::vector<Grit> dust;   // ~600 motes in a wide box
-    std::vector<Grit> motes;  // ~300 motes in a box around the hull
+    std::vector<Sky> stars;   // 700 points (plan 06 §5)
+    std::vector<Grit> dust;   // 600 motes in a wide box
+    std::vector<Grit> motes;  // 300 motes in a box around the hull
     float dust_box = 900.0f;
     float mote_box = 70.0f;
 };

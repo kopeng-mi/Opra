@@ -219,6 +219,143 @@ void test_mount_rules() {
     check(design_twr(kestrel, airless) == 0.0, "refit: TWR without a body is zero, not NaN");
 }
 
+void test_spinekit_gates_1_4() {
+    ChainDef chain;
+    chain.slots = 12;
+    chain.pitch = 4.0;
+    chain.half_width = 1.6;
+    chain.recess = 0.0;
+
+    // Gate 1: mount_transform returns §3.1's positions for slot 0, slot N-1 and a mid radial, all six facings.
+    Placement p_slot0;
+    p_slot0.slot = 0;
+    p_slot0.facing = Facing::Fore;
+    const Mount m_s0 = mount_transform(chain, p_slot0);
+    check_close(m_s0.pos.x, 0.0, 1e-9, "gate 1: slot 0 fore pos.x");
+    check_close(m_s0.pos.y, 20.0, 1e-9, "gate 1: slot 0 fore pos.y == 20 (L/2 - p)");
+    check_close(m_s0.pos.z, 0.0, 1e-9, "gate 1: slot 0 fore pos.z");
+
+    Placement p_slotN;
+    p_slotN.slot = 11;
+    p_slotN.facing = Facing::Aft;
+    const Mount m_sN = mount_transform(chain, p_slotN);
+    check_close(m_sN.pos.x, 0.0, 1e-9, "gate 1: slot 11 aft pos.x");
+    check_close(m_sN.pos.y, -20.0, 1e-9, "gate 1: slot 11 aft pos.y == -20");
+    check_close(m_sN.pos.z, 0.0, 1e-9, "gate 1: slot 11 aft pos.z");
+
+    Placement p_mid_rad;
+    p_mid_rad.slot = 5;
+    p_mid_rad.facing = Facing::Starboard;
+    const Mount m_mid = mount_transform(chain, p_mid_rad);
+    check_close(m_mid.pos.x, 1.6, 1e-9, "gate 1: slot 5 starboard pos.x == 1.6");
+    check_close(m_mid.pos.y, 2.0, 1e-9, "gate 1: slot 5 starboard pos.y == 2.0");
+    check_close(m_mid.pos.z, 0.0, 1e-9, "gate 1: slot 5 starboard pos.z == 0");
+
+    const Facing facings[6] = {Facing::Fore, Facing::Aft, Facing::Starboard,
+                               Facing::Port, Facing::Dorsal, Facing::Ventral};
+    const glm::dvec3 expected_dirs[6] = {
+        {0.0, 1.0, 0.0}, {0.0, -1.0, 0.0}, {1.0, 0.0, 0.0},
+        {-1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {0.0, 0.0, -1.0}
+    };
+    for (int i = 0; i < 6; ++i) {
+        Placement p;
+        p.facing = facings[i];
+        p.slot = 0;
+        p.roll = 0;
+        const Mount m = mount_transform(chain, p);
+        const glm::dvec3 forward = m.rot * glm::dvec3(0.0, 1.0, 0.0);
+        check_close(glm::length(forward - expected_dirs[i]), 0.0, 1e-9,
+                    "mount_transform: facing direction matches §3.2 (Gate 1)");
+    }
+
+    // Gate 2: A chain's composed bounds equal N·p along Y, to 1 mm.
+    // Slot 0 fore body occupies [m_s0.pos.y, m_s0.pos.y + p] = [20, 24].
+    // Slot 11 aft body occupies [m_sN.pos.y - p, m_sN.pos.y] = [-24, -20].
+    const Real bound_max_y = m_s0.pos.y + chain.pitch;
+    const Real bound_min_y = m_sN.pos.y - chain.pitch;
+    const Real composed_length_y = bound_max_y - bound_min_y;
+    const Real expected_length_y = static_cast<Real>(chain.slots) * chain.pitch;
+    check_close(composed_length_y, expected_length_y, 0.001,
+                "gate 2: chain composed bounds equal N*p along Y to 1 mm");
+
+    // Gate 3: Two parts whose cells intersect are rejected by mount_placement, returning false
+    // and leaving the design unmodified.
+    ShipDesign design;
+    design.spine = chain;
+    Placement p1;
+    p1.part = "tank_drum_1";
+    p1.slot = 1;
+    p1.facing = Facing::Starboard;
+    p1.span = 2; // occupies slots 1, 2 on Starboard
+    check(mount_placement(design, p1), "gate 3: initial part mounts");
+    check(design.placements.size() == 1, "gate 3: design has 1 placement");
+
+    // Overlapping placement: slot 2 on Starboard
+    Placement p_overlap;
+    p_overlap.part = "section_machinery";
+    p_overlap.slot = 2;
+    p_overlap.facing = Facing::Starboard;
+    p_overlap.span = 1;
+    check(!mount_placement(design, p_overlap), "gate 3: overlapping part is rejected");
+    check(design.placements.size() == 1, "gate 3: design remains unmodified after rejected mount");
+
+    // Axial lane sharing test: slot 4 fore and slot 4 aft share the Fore lane
+    Placement p_axial_fore;
+    p_axial_fore.part = "section_combat_a";
+    p_axial_fore.slot = 4;
+    p_axial_fore.facing = Facing::Fore;
+    p_axial_fore.span = 1;
+    check(mount_placement(design, p_axial_fore), "gate 3: axial fore part mounts");
+
+    Placement p_axial_aft_overlap;
+    p_axial_aft_overlap.part = "drive_twin_torch";
+    p_axial_aft_overlap.slot = 4;
+    p_axial_aft_overlap.facing = Facing::Aft;
+    p_axial_aft_overlap.span = 1;
+    check(!mount_placement(design, p_axial_aft_overlap),
+          "gate 3: axial aft in same slot as axial fore is rejected (shared Fore lane)");
+
+    // Non-overlapping placement: slot 2 on Port
+    Placement p_clear;
+    p_clear.part = "section_machinery";
+    p_clear.slot = 2;
+    p_clear.facing = Facing::Port;
+    p_clear.span = 1;
+    check(mount_placement(design, p_clear), "gate 3: non-overlapping part mounts");
+    check(design.placements.size() == 3, "gate 3: design now has 3 placements");
+
+    // Gate 4: mirror on a fore or aft facing is rejected.
+    Placement p_fore;
+    p_fore.part = "nose_hammerhead";
+    p_fore.facing = Facing::Fore;
+    p_fore.axial = true;
+    p_fore.span = 1;
+    check(!mount_placement(design, p_fore, true), "gate 4: mirror on fore facing is rejected");
+
+    Placement p_aft;
+    p_aft.part = "drive_twin_torch";
+    p_aft.facing = Facing::Aft;
+    p_aft.axial = true;
+    p_aft.span = 1;
+    check(!mount_placement(design, p_aft, true), "gate 4: mirror on aft facing is rejected");
+
+    // Mirror on radial facing succeeds
+    Placement p_gun;
+    p_gun.part = "section_radiator_wing";
+    p_gun.slot = 7;
+    p_gun.facing = Facing::Dorsal;
+    p_gun.span = 1;
+    check(mount_placement(design, p_gun, true), "gate 4: mirror on radial facing succeeds");
+    check(design.placements.size() == 5, "gate 4: mirrored pair adds 2 placements");
+    check(design.placements[3].facing == Facing::Dorsal && design.placements[4].facing == Facing::Ventral,
+          "gate 4: paired placements have opposite facings");
+
+    // Destroying one half of a mirrored pair leaves the other half flying.
+    design.placements[3].destroyed = true;
+    check(design.placements[3].destroyed, "gate 4: half A is destroyed");
+    check(!design.placements[4].destroyed, "gate 4: half B remains intact and flying");
+}
+
 int component_tests() {
     const int before = selftest::failures();
     test_stock_designs();
@@ -227,6 +364,7 @@ int component_tests() {
     test_centre_of_mass();
     test_torque_about_com();
     test_mount_rules();
+    test_spinekit_gates_1_4();
     return selftest::failures() - before;
 }
 

@@ -1155,6 +1155,8 @@ export function jet_nozzle(parent: THREE.Object3D, effects: THREE.Mesh[], opts: 
 export const FLANGE_RADIUS = 1.25;
 export function flange(root: THREE.Object3D, material: THREE.Material, pos: number[], normal: number[] = [0, 1, 0]): THREE.Group {
   const site = new THREE.Group();
+  site.name = 'flange';
+  site.userData.radius = FLANGE_RADIUS;
   site.position.set(pos[0], pos[1], pos[2]);
   site.quaternion.setFromUnitVectors(
     new THREE.Vector3(0, 1, 0),
@@ -1163,13 +1165,13 @@ export function flange(root: THREE.Object3D, material: THREE.Material, pos: numb
   // Ring plate and its rolled edge: the plate lands the bolts, the torus is the lip that catches
   // light. A three.js torus lies in the XY plane, so the lip yaws 90° about X to lie flat
   // about the +Y stack axis.
-  cylinder(site, material, FLANGE_RADIUS, FLANGE_RADIUS, 0.1, [0, 0, 0], 32);
-  torus(site, material, FLANGE_RADIUS - 0.09, 0.09, [0, 0.05, 0], [Math.PI / 2, 0, 0], 8, 32);
-  // Eight bolt bosses, raised proud of the face on the ring centreline.
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
+  cylinder(site, material, FLANGE_RADIUS, FLANGE_RADIUS, 0.1, [0, 0, 0], 12);
+  torus(site, material, FLANGE_RADIUS - 0.09, 0.09, [0, 0.05, 0], [Math.PI / 2, 0, 0], 4, 12);
+  // Six bolt bosses, raised proud of the face on the ring centreline.
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
     cylinder(site, material, 0.09, 0.09, 0.18,
-      [Math.cos(angle) * (FLANGE_RADIUS - 0.09), 0.06, Math.sin(angle) * (FLANGE_RADIUS - 0.09)], 8);
+      [Math.cos(angle) * (FLANGE_RADIUS - 0.09), 0.06, Math.sin(angle) * (FLANGE_RADIUS - 0.09)], 3);
   }
   // Copper alignment keys at 0° and 180°: the only warm-coloured thing on the interface, so a
   // loader can see the clocking without reading a stencil.

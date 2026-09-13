@@ -1,0 +1,128 @@
+{
+  "name": "section_machinery",
+  "scale": 1,
+  "aabb": {
+    "min": [
+      -3.4047,
+      -0.3251,
+      -1.663
+    ],
+    "max": [
+      3.4047,
+      3.97,
+      1.9132
+    ]
+  },
+  "aabbWithEffects": {
+    "min": [
+      -3.4047,
+      -0.3251,
+      -1.663
+    ],
+    "max": [
+      3.4047,
+      3.97,
+      1.9132
+    ]
+  },
+  "collider": {
+    "halfLength": 2.148,
+    "halfWidth": 3.405,
+    "shapes": [
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          1.663,
+          1.97
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          0,
+          2
+        ],
+        "angle": 0,
+        "half": [
+          0.725,
+          1.7
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          -2.68,
+          2
+        ],
+        "angle": -1.6908,
+        "half": [
+          1.7,
+          0.525
+        ]
+      },
+      {
+        "kind": "box",
+        "pos": [
+          2.68,
+          2
+        ],
+        "angle": 1.6908,
+        "half": [
+          1.7,
+          0.525
+        ]
+      }
+    ],
+    "bounds_radius": 5.1233
+  },
+  "ports": [],
+  "effects": [],
+  "hardpoints": {},
+  "maps": {
+    "size": 512,
+    "atlas": "planar XYZ tiles, uv v=0 at the model's up axis",
+    "slots": {
+      "normal": "section_machinery_normal",
+      "roughness": "section_machinery_roughness",
+      "albedo": "section_machinery_albedo"
+    },
+    "materials": 4
+  },
+  "stats": {},
+  "counts": {
+    "meshes": 5,
+    "vertices": 1632,
+    "triangles": 544
+  },
+  "part": {
+    "kind": "section_utility",
+    "span": 1,
+    "axial": true,
+    "modular": true,
+    "mass": 6500,
+    "propellant": 0,
+    "thrust": 0,
+    "cooling": 0.0075,
+    "heat_capacity": 6,
+    "rcs_jets": 0,
+    "rcs_authority": 0,
+    "flange": {
+      "pos": [
+        0,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        -1,
+        0
+      ],
+      "radius": 1.25
+    }
+  }
+}

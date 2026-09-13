@@ -102,6 +102,29 @@ bool is_drive(const Component &component) { return has_prefix(component.id, "dri
 
 bool is_rcs(const Component &component) { return has_prefix(component.id, "rcs."); }
 
+Vec2 centre_of_mass(const ShipDesign &design, const PartTable &parts) {
+    if (design.placements.empty()) return centre_of_mass(design);
+    Real mass = 0;
+    Vec2 moment{0, 0};
+    const Real L = static_cast<Real>(design.spine.slots) * design.spine.pitch;
+    for (const auto &p : design.placements) {
+        if (p.destroyed) continue;
+        auto it = parts.find(p.part);
+        if (it == parts.end()) continue;
+        const PartSpec &ps = it->second;
+        const Real centre_y = L * 0.5 - (static_cast<Real>(p.slot) + 0.5 * static_cast<Real>(p.span)) * design.spine.pitch;
+        Real pos_x = 0.0;
+        if (!is_axial(p.facing)) {
+            pos_x = face_dir(p.facing).x * (design.spine.half_width - design.spine.recess);
+        }
+        mass += ps.dry_mass;
+        moment.x += ps.dry_mass * pos_x;
+        moment.y += ps.dry_mass * centre_y;
+    }
+    if (mass <= 0) return {0, 0};
+    return {moment.x / mass, moment.y / mass};
+}
+
 Vec2 centre_of_mass(const ShipDesign &design) {
     Real mass = 0;
     Vec2 moment{};
@@ -164,6 +187,76 @@ Real derived_cooling(const ShipDesign &design) {
     return cooling;
 }
 
+ShipSpec derive_spec(const ShipDesign &design, const PartTable &parts) {
+    if (design.placements.empty()) return derive_spec(design);
+
+    Real M_dry = 0;
+    glm::dvec3 moment{0.0};
+    Real M_fuel = 0;
+    Real thrust = 0;
+    Real hull = 0;
+    Real cooling = 0;
+    int total_rcs_jets = 0;
+    const Real L = static_cast<Real>(design.spine.slots) * design.spine.pitch;
+
+    for (const auto &p : design.placements) {
+        if (p.destroyed) continue;
+        auto it = parts.find(p.part);
+        if (it == parts.end()) continue;
+        const PartSpec &ps = it->second;
+        const Real centre_y = L * 0.5 - (static_cast<Real>(p.slot) + 0.5 * static_cast<Real>(p.span)) * design.spine.pitch;
+        Real pos_x = 0.0;
+        if (!is_axial(p.facing)) {
+            pos_x = face_dir(p.facing).x * (design.spine.half_width - design.spine.recess);
+        }
+        M_dry += ps.dry_mass;
+        moment.x += ps.dry_mass * pos_x;
+        moment.y += ps.dry_mass * centre_y;
+        M_fuel += ps.propellant;
+        hull += ps.heat_capacity;
+        cooling += ps.cooling;
+        total_rcs_jets += ps.rcs_jets;
+
+        if (ps.thrust > 0) {
+            const Mount m = mount_transform(design.spine, p);
+            const glm::dvec3 thrust_dir = -(m.rot * glm::dvec3(0.0, 1.0, 0.0));
+            if (glm::dot(thrust_dir, glm::dvec3(0.0, 1.0, 0.0)) >= std::cos(DRIVE_ARC)) {
+                thrust += ps.thrust;
+            }
+        }
+    }
+
+    const glm::dvec3 com = (M_dry > 0) ? (moment / M_dry) : glm::dvec3(0.0);
+
+    Real torque = 0;
+    for (const auto &p : design.placements) {
+        if (p.destroyed) continue;
+        auto it = parts.find(p.part);
+        if (it == parts.end()) continue;
+        const PartSpec &ps = it->second;
+        if (ps.rcs_jets > 0 && ps.rcs_authority > 0) {
+            const Real centre_y = L * 0.5 - (static_cast<Real>(p.slot) + 0.5 * static_cast<Real>(p.span)) * design.spine.pitch;
+            torque += static_cast<Real>(ps.rcs_jets) * ps.rcs_authority * std::abs(centre_y - com.y);
+        }
+    }
+
+    ShipSpec spec{};
+    spec.name = design.name.c_str();
+    spec.role = design.role.c_str();
+    spec.mass = M_dry;
+    spec.thrust = thrust;
+    spec.fuel = M_fuel;
+    spec.torque = torque;
+    spec.hull = hull;
+    spec.length = 0;
+    spec.cargo = design.cargo;
+    spec.cooling = cooling;
+    spec.scanScale = design.scan_scale;
+    spec.collectScale = design.collect_scale;
+    spec.strafeFraction = std::clamp(0.055 * total_rcs_jets, 0.10, 0.45);
+    return spec;
+}
+
 ShipSpec derive_spec(const ShipDesign &design) {
     ShipSpec spec{};
     spec.name = design.name.c_str();
@@ -187,11 +280,88 @@ ShipSpec derive_spec(const ShipDesign &design) {
     return spec;
 }
 
-bool design_has_drive(const ShipDesign &design) {
+bool design_has_drive(const ShipDesign &design, const PartTable &parts) {
+    if (!design.placements.empty()) {
+        for (const auto &p : design.placements) {
+            if (p.destroyed) continue;
+            auto it = parts.find(p.part);
+            if (it != parts.end() && it->second.thrust > 0) {
+                const Mount m = mount_transform(design.spine, p);
+                const glm::dvec3 thrust_dir = -(m.rot * glm::dvec3(0.0, 1.0, 0.0));
+                if (glm::dot(thrust_dir, glm::dvec3(0.0, 1.0, 0.0)) >= std::cos(DRIVE_ARC)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     for (const Component &component : design.components) {
         if (is_drive(component) && component.thrust > 0) return true;
     }
     return false;
+}
+
+bool design_has_drive(const ShipDesign &design) {
+    if (!design.placements.empty()) {
+        for (const Placement &p : design.placements) {
+            if (p.destroyed) continue;
+            if (p.part.find("drive") != std::string::npos && p.facing == Facing::Aft) return true;
+        }
+        return false;
+    }
+    for (const Component &component : design.components) {
+        if (is_drive(component) && component.thrust > 0) return true;
+    }
+    return false;
+}
+
+OccupancyGrid design_occupancy(const ChainDef &chain, const std::vector<Placement> &placements) {
+    (void)chain;
+    OccupancyGrid grid{};
+    grid.fill(false);
+    for (const auto &p : placements) {
+        if (p.destroyed) continue;
+        for (int k = 0; k < p.span; ++k) {
+            const int s = p.slot + k;
+            if (s >= 0 && s < 16) {
+                grid[grid_index(s, p.facing)] = true;
+            }
+        }
+    }
+    return grid;
+}
+
+bool can_mount(const ChainDef &chain, const std::vector<Placement> &placements, const Placement &p) {
+    if (p.slot < 0 || p.span <= 0 || p.slot + p.span > chain.slots || chain.slots > 16) return false;
+    const OccupancyGrid grid = design_occupancy(chain, placements);
+    for (int k = 0; k < p.span; ++k) {
+        const int s = p.slot + k;
+        if (s >= 16 || grid[grid_index(s, p.facing)]) return false;
+    }
+    return true;
+}
+
+bool mount_placement(ShipDesign &design, const Placement &p, bool mirror) {
+    if (!can_mount(design.spine, design.placements, p)) return false;
+    if (mirror && is_axial(p.facing)) {
+        return false;  // Gate 3: mirror on fore/aft facing is rejected
+    }
+    if (mirror) {
+        Placement p_mir = p;
+        p_mir.facing = opposite_facing(p.facing);
+        p_mir.roll = -p.roll;
+        static int s_group = 1;
+        const int grp = s_group++;
+        Placement p1 = p;
+        p1.group = grp;
+        p_mir.group = grp;
+        if (!can_mount(design.spine, design.placements, p_mir)) return false;
+        design.placements.push_back(p1);
+        design.placements.push_back(p_mir);
+        return true;
+    }
+    design.placements.push_back(p);
+    return true;
 }
 
 bool mount_component(ShipDesign &design, const Component &component) {

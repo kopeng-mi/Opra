@@ -11,6 +11,31 @@
 
 namespace opra {
 
+double wrap180(double deg) {
+    double d = std::fmod(deg, 360.0);
+    if (d <= -180.0) d += 360.0;
+    if (d > 180.0) d -= 360.0;
+    if (d == -180.0) d = 180.0;
+    return d;
+}
+
+ArcMark calculate_arc_mark(double bearing_deg, double nose_deg, float phi_max) {
+    ArcMark mark;
+    mark.live = true;
+    const double delta = wrap180(bearing_deg - nose_deg);
+    if (std::abs(delta) <= 45.0) {
+        mark.on_tape = true;
+        mark.clamped = false;
+        mark.phi = static_cast<float>(phi_max * (delta / 45.0));
+    } else {
+        mark.on_tape = false;
+        mark.clamped = true;
+        mark.pointing_right = delta > 0.0;
+        mark.phi = delta > 0.0 ? phi_max : -phi_max;
+    }
+    return mark;
+}
+
 using ui::Rect;
 
 namespace {
@@ -244,6 +269,7 @@ void draw_bars(UIBatch &batch, const HudFrame &frame, const Rect &at) {
  * it is standing on, and what the survey and the satellites have to say.
  */
 void draw_worlds(UIBatch &batch, const HudFrame &frame, const Rect &at) {
+    draw_scrim(batch, at);
     block_header(batch, at, "WORLD", frame.worldsBody);
     float y = at.y + 22.0f;
     const auto row = [&](const char *label, const std::string &value, const glm::vec4 &color) {
@@ -279,6 +305,8 @@ void draw_worlds(UIBatch &batch, const HudFrame &frame, const Rect &at) {
     }
 }
 
+}  // namespace
+
 // ---------------------------------------------------------------- the s4.1 blocks
 //
 // KSP's lesson (J7): dense information reads when it is grouped into bounded blocks, each answering
@@ -295,6 +323,7 @@ float vessel_block_height(const HudFrame &frame) {
 }
 
 void build_vessel_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
+    draw_scrim(batch, at);
     block_header(batch, at, "VESSEL", frame.shipName);
     Rect bars = at;
     bars.y += 22.0f;
@@ -306,7 +335,10 @@ void build_vessel_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
     block_row(batch, at, rows_y + 20.0f, "TWR",
               frame.twrValid ? readout(static_cast<float>(frame.twr), 2, "") : std::string("--"),
               frame.twrValid && frame.twr < 1.0 ? Weight::Critical : Weight::Live);
-    block_row(batch, at, rows_y + 40.0f, "\xce\x94v", speed_readout(frame.deltaV),
+    const std::string dv_str = (frame.fuelFrac > 0.001f && frame.deltaV > 0.0)
+                                   ? speed_readout(frame.deltaV)
+                                   : std::string("--");
+    block_row(batch, at, rows_y + 40.0f, "dv budget", dv_str,
               frame.deltaV <= 0.01 ? Weight::Critical : Weight::Live);
 }
 
@@ -317,6 +349,7 @@ float weapons_block_height(const HudFrame &frame) {
 }
 
 void build_weapons_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
+    draw_scrim(batch, at);
     block_header(batch, at, "WEAPONS");
     const float rows_y = at.y + 22.0f;
     for (int i = 0; i < frame.gunCount; ++i) {
@@ -341,9 +374,10 @@ float node_block_height(const HudFrame &frame) {
 
 void build_node_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
     if (!frame.nodeValid) return;
+    draw_scrim(batch, at);
     block_header(batch, at, "NODE", "circularise");
     const float rows_y = at.y + 22.0f;
-    block_row(batch, at, rows_y, "\xce\x94v", speed_readout(frame.nodeDeltaV));
+    block_row(batch, at, rows_y, "node dv", speed_readout(frame.nodeDeltaV));
     block_row(batch, at, rows_y + 20.0f, "burn", frame.nodeBurnSeconds > 0.0
                                                       ? span_readout(frame.nodeBurnSeconds)
                                                       : std::string("instant"));
@@ -358,6 +392,7 @@ float threat_block_height(const HudFrame &frame) {
 
 void build_threat_block(UIBatch &batch, const HudFrame &frame, const Rect &at) {
     if (!frame.underFire) return;
+    draw_scrim(batch, at);
     block_header(batch, at, "THREAT");
     block_row(batch, at, at.y + 22.0f, "hull", readout(frame.hullValue, 0, ""), Weight::Critical);
 }
@@ -403,8 +438,8 @@ void draw_top_strip(UIBatch &batch, const HudFrame &frame, const Rect &safe) {
     push_disc(batch, {right - 2.0f, safe.y + 6.0f}, 2.0f, status_color(frame.status));
     char warp[48];
     if (frame.warpSuggest > frame.warpRate + 0.01 && frame.warpRate <= 1.0) {
-        // The rail's suggestion (s2.7): shown, never applied silently.
-        std::snprintf(warp, sizeof warp, "warp %gx  \xe2\x96\xb3 %gx", frame.warpRate,
+        // The rail's suggestion (s2.7): shown, never applied silently (T-14).
+        std::snprintf(warp, sizeof warp, "warp %gx  -> %gx", frame.warpRate,
                       frame.warpSuggest);
     } else {
         std::snprintf(warp, sizeof warp, "warp %gx", frame.warpRate);
@@ -413,42 +448,223 @@ void draw_top_strip(UIBatch &batch, const HudFrame &frame, const Rect &safe) {
               TextFace::Label);
 }
 
-/** The bottom strip: throttle, g, heading, and the keys that are always live. */
-void draw_bottom_strip(UIBatch &batch, const HudFrame &frame, const Rect &safe) {
-    const float y = safe.y + safe.h - 30.0f;
-    const float bar_w = 120.0f;
-    push_text(batch, "throttle", 11.0f, {safe.x, y + 6.0f}, TextAlign::Left, ETCH_DIM,
-              TextFace::Label);
-    push_rect(batch, {safe.x + 58.0f, y + 12.0f}, {bar_w, 3.0f}, with_alpha(ETCH, 0.12f));
-    push_rect(batch, {safe.x + 58.0f, y + 12.0f}, {bar_w * ui::clamp01(frame.throttle), 3.0f},
-              DRIVE);
-    push_text(batch, readout(ui::clamp01(frame.throttle), 2, "").c_str(), 15.0f,
-              {safe.x + 58.0f + bar_w + 10.0f, y}, TextAlign::Left, ETCH);
+void build_arc(UIBatch &batch, const HudFrame &frame, float width, float height) {
+    const float inset = ui::tokens::safe_inset(width, height);
+    float A = std::clamp(width * 0.30f, 300.0f, 520.0f);
+    const float s = 52.0f;
+    const float R = (A * A + s * s) / (2.0f * s);
+    const float phi_max = std::asin(A / R);
+    const float y_apex = height - inset - 96.0f;
+    const glm::vec2 C(width * 0.5f, y_apex + R);
 
-    const float centre_x = safe.x + safe.w * 0.5f;
-    char g[32];
-    std::snprintf(g, sizeof g, "%.2f g", frame.accelerationG);
-    push_text(batch, g, 15.0f, {centre_x - 60.0f, y}, TextAlign::Right, ETCH);
-    char hdg[16];
-    std::snprintf(hdg, sizeof hdg, "%03d\xc2\xb0",
-                  static_cast<int>(std::lround(frame.headingDeg)) % 360);
-    push_text(batch, hdg, 15.0f, {centre_x + 60.0f, y}, TextAlign::Left, ETCH);
+    const auto n_dir = [](float phi) {
+        return glm::vec2(std::sin(phi), -std::cos(phi));
+    };
+    const auto p_point = [&](float phi) {
+        return C + R * n_dir(phi);
+    };
 
-    const float right = safe.x + safe.w;
-    push_text(batch, frame.assist ? "assist F" : "assist off F", 11.0f, {right - 210.0f, y + 4.0f},
-              TextAlign::Left, frame.assist ? NAV : ETCH_DIM, TextFace::Label);
-    push_text(batch, "kill X", 11.0f, {right - 120.0f, y + 4.0f}, TextAlign::Left,
-              frame.braking ? DRIVE : ETCH_DIM, TextFace::Label);
-    push_text(batch, "warp . ,", 11.0f, {right, y + 4.0f}, TextAlign::Right, ETCH_DIM,
-              TextFace::Label);
+    // Scrim for the arc area (plan 06 §3.4)
+    ui::push_rect(batch, {width * 0.5f - A - 40.0f, y_apex - 12.0f}, {(A + 40.0f) * 2.0f, 108.0f},
+                  with_alpha(ui::tokens::FIELD, 0.72f));
+
+    // 1. The arc line: shallow curve from -phi_max to +phi_max
+    constexpr int kSteps = 48;
+    for (int i = 0; i < kSteps; ++i) {
+        const float p0 = -phi_max + (2.0f * phi_max) * (static_cast<float>(i) / kSteps);
+        const float p1 = -phi_max + (2.0f * phi_max) * (static_cast<float>(i + 1) / kSteps);
+        push_line(batch, p_point(p0), p_point(p1), 1.5f, with_alpha(ETCH, 0.55f));
+    }
+    push_line(batch, p_point(-phi_max), p_point(-phi_max) + n_dir(-phi_max) * 8.0f, 1.5f,
+              with_alpha(ETCH, 0.65f));
+    push_line(batch, p_point(phi_max), p_point(phi_max) + n_dir(phi_max) * 8.0f, 1.5f,
+              with_alpha(ETCH, 0.65f));
+
+    const double nose_deg = frame.headingDeg;
+    const bool nose_nan = std::isnan(nose_deg);
+    const double eff_nose = nose_nan ? 0.0 : nose_deg;
+
+    // 2. Heading ticks
+    const int start_tick = static_cast<int>(std::floor((eff_nose - 45.0) / 5.0)) * 5;
+    const int end_tick = static_cast<int>(std::ceil((eff_nose + 45.0) / 5.0)) * 5;
+    for (int t = start_tick; t <= end_tick; t += 5) {
+        const double delta = wrap180(static_cast<double>(t) - eff_nose);
+        if (std::abs(delta) > 45.0) continue;
+        const float phi = static_cast<float>(phi_max * (delta / 45.0));
+        const glm::vec2 n = n_dir(phi);
+        const glm::vec2 p0 = p_point(phi);
+        const bool major = (t % 10 == 0);
+        if (major) {
+            push_line(batch, p0, p0 + n * 12.0f, 1.2f, with_alpha(ETCH, 0.65f));
+            const int norm_deg = ((t % 360) + 360) % 360;
+            char buf[8];
+            std::snprintf(buf, sizeof buf, "%03d", norm_deg);
+            push_text(batch, buf, 12.0f, p0 + n * 23.0f, TextAlign::Center,
+                      with_alpha(ETCH, 0.85f), TextFace::Label);
+        } else if (width >= 900.0f) {
+            push_line(batch, p0, p0 + n * 6.0f, 1.0f, with_alpha(ETCH_DIM, 0.45f));
+        }
+    }
+
+    // 3. Index caret at (W/2, y_apex - 16)
+    const glm::vec2 caret_tip(width * 0.5f, y_apex - 2.0f);
+    push_triangle(batch, caret_tip, {width * 0.5f - 6.0f, y_apex - 14.0f},
+                  {width * 0.5f + 6.0f, y_apex - 14.0f}, NAV);
+
+    // Heading numeral under apex at (W/2, y_apex + 34), %03.0f, READOUT_LARGE
+    char hdg_buf[16];
+    if (nose_nan) {
+        std::snprintf(hdg_buf, sizeof hdg_buf, "--");
+    } else {
+        std::snprintf(hdg_buf, sizeof hdg_buf, "%03.0f", eff_nose);
+    }
+    push_text(batch, hdg_buf, 32.0f, {width * 0.5f, y_apex + 18.0f}, TextAlign::Center,
+              ETCH, TextFace::Readout);
+
+    // 4. Readout row, baseline y_apex + 62 (plan 06 §3.2):
+    // Speed: W/2 - A * 0.55
+    const float x_spd = width * 0.5f - A * 0.55f;
+    std::string spd_str = (frame.speed > 0.05) ? readout(static_cast<float>(frame.speed), 1, "") : "0.0";
+    push_text(batch, spd_str.c_str(), 24.0f, {x_spd, y_apex + 50.0f}, TextAlign::Center,
+              ETCH, TextFace::Readout);
+    push_text(batch, "m/s", 11.0f, {x_spd, y_apex + 76.0f}, TextAlign::Center,
+              ETCH_DIM, TextFace::Label);
+
+    // Acceleration: W/2 + A * 0.55
+    const float x_acc = width * 0.5f + A * 0.55f;
+    char acc_buf[16];
+    std::snprintf(acc_buf, sizeof acc_buf, "%.2f g", static_cast<double>(frame.accelerationG));
+    push_text(batch, acc_buf, 24.0f, {x_acc, y_apex + 50.0f}, TextAlign::Center,
+              ETCH, TextFace::Readout);
+    push_text(batch, "accel", 11.0f, {x_acc, y_apex + 76.0f}, TextAlign::Center,
+              ETCH_DIM, TextFace::Label);
+
+    // Throttle: W/2 - A - 28, a 72 px vertical bar filled bottom-up (T-7)
+    const float x_thr = width * 0.5f - A - 28.0f;
+    const float thr_h = 72.0f;
+    const float thr_w = 8.0f;
+    const float thr_top = y_apex + 14.0f;
+    push_rect(batch, {x_thr - thr_w * 0.5f, thr_top}, {thr_w, thr_h}, with_alpha(ETCH, 0.18f));
+    const float fill_h = thr_h * ui::clamp01(frame.throttle);
+    if (fill_h > 0.0f) {
+        push_rect(batch, {x_thr - thr_w * 0.5f, thr_top + (thr_h - fill_h)}, {thr_w, fill_h}, DRIVE);
+    }
+    push_text(batch, "thr", 11.0f, {x_thr, thr_top + thr_h + 4.0f}, TextAlign::Center,
+              ETCH_DIM, TextFace::Label);
+
+    // Warp rate: W/2 + A + 28
+    const float x_wrp = width * 0.5f + A + 28.0f;
+    char wrp_buf[32];
+    std::snprintf(wrp_buf, sizeof wrp_buf, "warp %gx", frame.warpRate);
+    push_text(batch, wrp_buf, 14.0f, {x_wrp, y_apex + 56.0f}, TextAlign::Center,
+              ETCH, TextFace::Label);
+
+    // 5. Marks in the bowl at p(phi) - n * 10
+    std::vector<float> placed_x;
+    const auto draw_mark = [&](double bearing, const glm::vec4 &col, int type) {
+        const ArcMark am = calculate_arc_mark(bearing, eff_nose, phi_max);
+        const glm::vec2 n = n_dir(am.phi);
+        glm::vec2 at = p_point(am.phi) - n * 10.0f;
+
+        // Anti-overlap: two marks within 6 px stack 10 px lower
+        for (float px : placed_x) {
+            if (std::abs(at.x - px) < 6.0f) {
+                at = at - n * 10.0f;
+                break;
+            }
+        }
+        placed_x.push_back(at.x);
+
+        const float alpha = am.clamped ? 0.7f : 1.0f;
+        const glm::vec4 m_color = with_alpha(col, col.a * alpha);
+
+        if (am.clamped) {
+            const float sgn = am.pointing_right ? 1.0f : -1.0f;
+            const glm::vec2 tan(n.y, -n.x);
+            const glm::vec2 tip = at + tan * (sgn * 6.0f);
+            push_line(batch, at - tan * (sgn * 2.0f), tip, 1.5f, m_color);
+            push_line(batch, tip, tip - (tan * sgn + n) * 4.0f, 1.5f, m_color);
+        } else {
+            switch (type) {
+                case 0: { // Prograde
+                    push_arc(batch, at, 4.5f, 0.0f, TAU, 1.2f, m_color);
+                    push_disc(batch, at, 1.5f, m_color);
+                    break;
+                }
+                case 1: { // Retrograde
+                    push_arc(batch, at, 4.5f, 0.0f, TAU, 1.2f, m_color);
+                    const glm::vec2 t(-n.y, n.x);
+                    push_line(batch, at - t * 4.5f, at + t * 4.5f, 1.2f, m_color);
+                    push_line(batch, at - n * 4.5f, at + n * 4.5f, 1.2f, m_color);
+                    break;
+                }
+                case 2: { // Target
+                    const glm::vec2 t(-n.y, n.x);
+                    push_line(batch, at + n * 4.5f, at + t * 4.5f, 1.5f, m_color);
+                    push_line(batch, at + t * 4.5f, at - n * 4.5f, 1.5f, m_color);
+                    push_line(batch, at - n * 4.5f, at - t * 4.5f, 1.5f, m_color);
+                    push_line(batch, at - t * 4.5f, at + n * 4.5f, 1.5f, m_color);
+                    break;
+                }
+                case 3: { // Node
+                    push_arc(batch, at, 5.0f, 0.0f, TAU, 1.2f, m_color);
+                    const glm::vec2 t(-n.y, n.x);
+                    push_line(batch, at - t * 3.0f, at + t * 3.0f, 1.2f, m_color);
+                    push_line(batch, at - n * 3.0f, at + n * 3.0f, 1.2f, m_color);
+                    break;
+                }
+                case 4: { // Director cue
+                    const glm::vec2 t(-n.y, n.x);
+                    push_line(batch, at - t * 5.0f, at + t * 5.0f, 1.5f, m_color);
+                    push_line(batch, at - n * 5.0f, at + n * 5.0f, 1.5f, m_color);
+                    push_arc(batch, at, 6.0f, 0.0f, TAU, 1.0f, m_color);
+                    break;
+                }
+                default:
+                    push_disc(batch, at, 3.0f, m_color);
+                    break;
+            }
+        }
+    };
+
+    if (frame.speed >= 0.05) {
+        const double vel_heading = std::atan2(static_cast<double>(frame.velocityDir.x),
+                                              static_cast<double>(-frame.velocityDir.y)) * (180.0 / 3.14159265358979323846);
+        const double pro_deg = std::fmod(std::fmod(vel_heading, 360.0) + 360.0, 360.0);
+        const double retro_deg = std::fmod(pro_deg + 180.0, 360.0);
+        const double pro_delta = wrap180(pro_deg - eff_nose);
+        const double retro_delta = wrap180(retro_deg - eff_nose);
+
+        if (std::abs(pro_delta) <= 45.0) {
+            draw_mark(pro_deg, NAV, 0);
+        } else if (std::abs(retro_delta) <= 45.0) {
+            draw_mark(retro_deg, with_alpha(NAV, 0.8f), 1);
+        } else {
+            if (std::abs(pro_delta) <= std::abs(retro_delta)) {
+                draw_mark(pro_deg, NAV, 0);
+            } else {
+                draw_mark(retro_deg, with_alpha(NAV, 0.8f), 1);
+            }
+        }
+    }
+
+    for (const CollarMark &mark : frame.marks) {
+        if (mark.kind == MarkKind::Target) {
+            const double target_deg = std::fmod(90.0 - static_cast<double>(mark.bearing) * (180.0 / 3.14159265358979323846) + 360.0, 360.0);
+            draw_mark(target_deg, NAV, 2);
+        }
+    }
+
+    if (frame.director.active) {
+        const double dir_deg = std::fmod(frame.director.heading * (180.0 / 3.14159265358979323846) + 360.0, 360.0);
+        const glm::vec4 dir_col = frame.director.throttle > 0.0f ? DRIVE : ETCH;
+        draw_mark(dir_deg, dir_col, 4);
+    }
 }
-
-}  // namespace
 
 void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
     const float width = frame.screen.x;
     const float height = frame.screen.y;
-    const glm::vec2 centre = frame.shipScreen;
 
     // D-18: one safe-area inset for the whole layout - 28 px, or 3% of the short edge.
     const float inset = std::max(28.0f, std::min(width, height) * 0.03f);
@@ -456,15 +672,11 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
     const bool narrow = safe.w < 1000.0f;  // s4.6: the right column collapses under the left
     const float column_w = 300.0f;
 
-    float radius = frame.radius > 0.0f ? frame.radius
-                                       : std::clamp(std::min(width, height) * 0.29f, 150.0f, 260.0f);
-    radius = std::min(radius, std::min(width, height) * 0.5f - LABEL_RADIUS - 4.0f);
-
     draw_top_strip(batch, frame, safe);
-    draw_bottom_strip(batch, frame, safe);
 
-    // The columns start below the top strip and stop above the bottom strip.
-    const Rect columns{safe.x, safe.y + 70.0f, safe.w, safe.h - 110.0f};
+    // The columns start below the top strip and stop above the arc reserved span (plan 06 §3.6).
+    const float y_apex = height - inset - 96.0f;
+    const Rect columns{safe.x, safe.y + 70.0f, safe.w, y_apex - 24.0f - (safe.y + 70.0f)};
     const Rect left_column{columns.x, columns.y, column_w, columns.h};
     const Rect right_base{columns.x + columns.w - column_w, columns.y, column_w, columns.h};
 
@@ -513,195 +725,37 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
                       right.place("minimap", minimap_block_height(frame.minimap)));
     }
 
-    // ---- the collar: the navball analogue (s4.4) ------------------------------------------
-    if (!frame.hideCollar && radius >= 12.0f) {
-        // The ring: a full circle less the deliberate 40 degree gap at the top.
-        push_arc(batch, centre, radius, TOP + GAP_HALF, TOP - GAP_HALF + TAU, RING_WIDTH,
-                 with_alpha(ETCH_DIM, RING_ALPHA));
-
-        // Range rings (S-2): the labels sit on the 45-degree diagonals and never on the hull - a
-        // ring that would land inside the ship's own screen disc draws neither arc nor label,
-        // whatever the zoom is doing. Under a 160 px collar the labels go entirely.
+    // Range rings (T-16): live only under a 2 km half-height. Center on ship, scale in world metres.
+    if (frame.zoom < 2000.0) {
+        const float px_per_metre = static_cast<float>(height / (2.0 * frame.zoom));
         for (float metres : RANGE_RING_METRES) {
-            const float r = radius * (metres / FAR_RANGE);
+            const float r = metres * px_per_metre;
             const bool under_hull = r < frame.shipRadiusPx + 8.0f;
             if (!under_hull) {
-                push_arc(batch, centre, r, 0.0f, TAU, 1.0f, with_alpha(ETCH_DIM, RANGE_RING_ALPHA));
+                push_arc(batch, frame.shipScreen, r, 0.0f, TAU, 1.0f, with_alpha(ETCH_DIM, RANGE_RING_ALPHA));
             }
-            if (under_hull || radius < 160.0f) continue;
+            if (under_hull || r < 30.0f) continue;
             const std::string label = readout(metres, 0, " m");
             const glm::vec2 at(
-                centre.x + std::cos(RANGE_RING_LABEL_ANGLE) * (r + RANGE_RING_LABEL_GAP),
-                centre.y + std::sin(RANGE_RING_LABEL_ANGLE) * (r + RANGE_RING_LABEL_GAP) - 6.0f);
+                frame.shipScreen.x + std::cos(RANGE_RING_LABEL_ANGLE) * (r + RANGE_RING_LABEL_GAP),
+                frame.shipScreen.y + std::sin(RANGE_RING_LABEL_ANGLE) * (r + RANGE_RING_LABEL_GAP) - 6.0f);
             push_text(batch, label.c_str(), 12.0f, at, TextAlign::Left,
-                      with_alpha(ETCH_DIM, RANGE_RING_LABEL_ALPHA));
-        }
-
-        // The bearing ladder: a tick every 10 degrees, a numbered major every 30.
-        const int ladder_steps = static_cast<int>((LADDER_HALF * 2.0f) / LADDER_STEP + 0.5f);
-        for (int k = 0; k <= ladder_steps; ++k) {
-            const float angle = TOP - LADDER_HALF + static_cast<float>(k) * LADDER_STEP;
-            if (angle > TOP - GAP_HALF && angle < TOP + GAP_HALF) continue;
-            const bool major = (k % LADDER_MAJOR_EVERY) == 0;
-            const float len = major ? LADDER_MAJOR_LEN : LADDER_MINOR_LEN;
-            const glm::vec2 dir(std::cos(angle), std::sin(angle));
-            push_line(batch, centre + dir * radius, centre + dir * (radius + len), RING_WIDTH,
-                      with_alpha(ETCH_DIM, major ? LADDER_ALPHA : LADDER_ALPHA * 0.6f));
-            if (!major) continue;
-            const int bearing = ((static_cast<int>(std::lround(-angle / DEG)) % 360) + 360) % 360;
-            char label[8];
-            std::snprintf(label, sizeof label, "%03d", bearing);
-            push_text(batch, label, 12.0f,
-                      centre + dir * (radius + LADDER_LABEL_RADIUS) - glm::vec2(9.0f, 6.0f),
-                      TextAlign::Left, with_alpha(ETCH_DIM, LADDER_ALPHA));
-        }
-
-        // The drive arc: dormant scale, thrust clockwise, retro counter-clockwise.
-        const float heat = ui::clamp01(frame.heat);
-        const float forward = ui::clamp01(frame.thrust / THRUST_MAX);
-        const float retro = ui::clamp01(-frame.thrust / RETRO_MAX);
-        push_arc(batch, centre, radius, BOTTOM - ARC_HALF, BOTTOM + ARC_HALF, ARC_WIDTH,
-                 with_alpha(ETCH_DIM, ARC_ALPHA));
-        if (forward > 0.0f || retro > 0.0f) {
-            float alpha = 1.0f;
-            if (heat > OVERHEAT && !frame.reducedMotion) {
-                alpha = PULSE_FLOOR + (1.0f - PULSE_FLOOR) *
-                                          (0.5f + 0.5f * std::sin(frame.time * PULSE_RATE));
-            }
-            const glm::vec4 arc_color = with_alpha(ui::lerp_color(DRIVE, THREAT, heat), alpha);
-            if (forward > 0.0f) {
-                push_arc(batch, centre, radius, BOTTOM, BOTTOM + forward * ARC_HALF, ARC_WIDTH,
-                         arc_color);
-            }
-            if (retro > 0.0f) {
-                push_arc(batch, centre, radius, BOTTOM, BOTTOM - retro * ARC_HALF, ARC_WIDTH,
-                         arc_color);
-            }
-        }
-
-        // The navball marks (s4.4): a vector the pilot flies by gets a place on the ring.
-        // Prograde style is a circle with a dot; retrograde, the circle with a bar.
-        const auto collar_mark = [&](float bearing_rad, const glm::vec4 &color, bool prograde) {
-            const glm::vec2 u(std::cos(-bearing_rad), std::sin(-bearing_rad));
-            const glm::vec2 t(-u.y, u.x);
-            const glm::vec2 at = centre + u * radius;
-            push_arc(batch, at, 5.0f, 0.0f, TAU, 1.4f, color);
-            if (prograde) {
-                push_disc(batch, at, 1.6f, color);
-            } else {
-                push_line(batch, at - t * 5.0f, at + t * 5.0f, 1.4f, color);
-            }
-        };
-        // Prograde / retrograde from the world-frame velocity, target / anti-target from the
-        // tracked contact's bearing.
-        if (frame.speed > 0.5) {
-            const float bearing =
-                static_cast<float>(std::atan2(frame.velocityDir.y, frame.velocityDir.x) -
-                                   1.5707963267948966);
-            collar_mark(bearing, NAV, true);
-            collar_mark(bearing + 3.14159265f, with_alpha(NAV, 0.55f), false);
-        }
-        if (frame.targetValid) {
-            float rel_bearing = 0.0f;
-            for (const CollarMark &mark : frame.marks) {
-                if (mark.kind == MarkKind::Target) rel_bearing = mark.bearing;
-            }
-            collar_mark(rel_bearing, with_alpha(ETCH, 0.9f), true);
-            collar_mark(rel_bearing + 3.14159265f, with_alpha(ETCH, 0.45f), false);
-        }
-
-        // The marks.
-        for (const CollarMark &mark : frame.marks) {
-            // World is +x right / +y up, the HUD is y-down: a bearing b is HUD angle -b.
-            const glm::vec2 u(std::cos(-mark.bearing), std::sin(-mark.bearing));
-            const float strength = ui::clamp01(mark.strength);
-            const float far = mark.range > FAR_RANGE ? FAR_ALPHA : 1.0f;
-            switch (mark.kind) {
-                case MarkKind::Velocity: {
-                    const glm::vec2 t(-u.y, u.x);
-                    push_triangle(batch, centre + u * (radius + VELOCITY_LENGTH),
-                                  centre + u * radius + t * VELOCITY_BASE,
-                                  centre + u * radius - t * VELOCITY_BASE,
-                                  with_alpha(ETCH, (0.55f + 0.45f * strength) * far));
-                    break;
-                }
-                case MarkKind::Target: {
-                    const glm::vec2 t(-u.y, u.x);
-                    const glm::vec2 tip = centre + u * (radius + TARGET_OUT);
-                    const glm::vec2 base = centre + u * (radius - TARGET_OUT);
-                    const glm::vec4 color = with_alpha(NAV, 0.7f + 0.3f * strength);
-                    push_line(batch, base + t * TARGET_ARM, tip, TARGET_WIDTH, color);
-                    push_line(batch, tip, base - t * TARGET_ARM, TARGET_WIDTH, color);
-                    break;
-                }
-                case MarkKind::Hostile: {
-                    const float len = HOSTILE_MIN + HOSTILE_SPAN * strength;
-                    push_line(batch, centre + u * radius, centre + u * (radius + len), HOSTILE_WIDTH,
-                              with_alpha(THREAT, (0.45f + 0.55f * strength) * far));
-                    break;
-                }
-                case MarkKind::Contact:
-                    push_disc(batch, centre + u * radius, CONTACT_RADIUS,
-                              with_alpha(NAV, (0.4f + 0.55f * strength) * far));
-                    break;
-                case MarkKind::Ore:
-                    push_disc(batch, centre + u * radius, ORE_RADIUS, with_alpha(NAV, 0.4f * far));
-                    break;
-            }
+                      with_alpha(ETCH_DIM, RANGE_RING_LABEL_ALPHA), TextFace::Label);
         }
     }
 
-    // The director's cross (G8): where the cue wants the nose, on the collar's own ring.
-    if (!frame.hideCollar && radius >= 12.0f && frame.director.active) {
-        constexpr float CROSS_OUT = 10.0f;
-        constexpr float CROSS_ARM = 6.0f;
-        const float bearing = static_cast<float>(frame.director.heading);
-        const glm::vec2 u(std::cos(-bearing), std::sin(-bearing));
-        const glm::vec2 at = centre + u * (radius + CROSS_OUT);
-        const glm::vec2 across(-u.y, u.x);
-        const glm::vec4 cross_color = frame.director.throttle > 0.0f ? DRIVE : ETCH;
-        push_line(batch, at - across * CROSS_ARM, at + across * CROSS_ARM, 1.5f,
-                  with_alpha(cross_color, 0.9f));
-        push_line(batch, at - u * CROSS_ARM, at + u * CROSS_ARM, 1.5f,
-                  with_alpha(cross_color, 0.9f));
-        push_arc(batch, at, CROSS_ARM + 2.0f, 0.0f, TAU, 1.0f, with_alpha(cross_color, 0.55f));
-    }
+    // Bottom arc instrument (plan 06 §3.2, L3, L4, fixes T-5, T-7, T-13)
+    build_arc(batch, frame, width, height);
 
-    // ---- centre: the two vectors the pilot flies by, then the readouts under the ship
-    if (frame.speed > 0.5) {
-        const float length_px = std::min(24.0f + static_cast<float>(frame.speed) * 1.35f, 190.0f);
-        const glm::vec2 tip = frame.shipScreen + frame.velocityDir * length_px;
-        push_line(batch, frame.shipScreen, tip, 1.5f, with_alpha(NAV, 0.85f));
-        const glm::vec2 across(-frame.velocityDir.y, frame.velocityDir.x);
-        push_line(batch, tip - across * 5.0f, tip + across * 5.0f, 1.5f, with_alpha(NAV, 0.85f));
-    }
-    if (!frame.wrecked) {
-        const glm::vec2 nose_tip = frame.shipScreen + frame.noseDir * (frame.shipRadiusPx + 22.0f);
-        push_line(batch, frame.shipScreen + frame.noseDir * (frame.shipRadiusPx + 6.0f), nose_tip,
-                  1.5f, with_alpha(ETCH, 0.7f));
-    }
     if (frame.wrecked) {
-        push_text(batch, "HULL LOST", 46.0f, {centre.x, centre.y - 150.0f}, TextAlign::Center,
+        push_text(batch, "HULL LOST", 46.0f, {width * 0.5f, height * 0.5f - 150.0f}, TextAlign::Center,
                   THREAT);
-        push_text(batch, "R restarts the run", 17.0f, {centre.x, centre.y - 108.0f},
+        push_text(batch, "R restarts the run", 17.0f, {width * 0.5f, height * 0.5f - 108.0f},
                   TextAlign::Center, ETCH, TextFace::Label);
     } else {
-        const float under_ship = centre.y + frame.shipRadiusPx + 14.0f;
-        if (frame.speed > 0.05) {
-            push_text(batch, readout(static_cast<float>(frame.speed), 1, "").c_str(), 46.0f,
-                      {centre.x, under_ship}, TextAlign::Center, ETCH);
-            push_text(batch, "m/s", 11.0f, {centre.x, under_ship + 50.0f}, TextAlign::Center,
-                      ETCH_DIM, TextFace::Label);
-        }
-        if (frame.targetValid) {
-            // The tracked contact's range: the collar's target mark says where, this says how far.
-            push_text(batch, distance_readout(frame.targetRange).c_str(), 17.0f,
-                      {centre.x, under_ship + (frame.speed > 0.05 ? 66.0f : 0.0f)},
-                      TextAlign::Center, with_alpha(NAV, 0.9f), TextFace::Label);
-        }
         if (frame.context && *frame.context) {
             push_text(batch, frame.context, 12.0f,
-                      {centre.x, under_ship + (frame.speed > 0.05 ? 92.0f : 26.0f)},
+                      {width * 0.5f, y_apex - 26.0f},
                       TextAlign::Center, frame.contextColor, TextFace::Label);
         }
     }

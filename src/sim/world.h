@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "sim/combat.h"
+#include "sim/component.h"
 #include "sim/dock.h"
 #include "sim/descent.h"
 #include "sim/terrain.h"
@@ -73,6 +74,10 @@ struct World {
     int primary = -1;
 
     ShipState ship = create_ship(ShipClass::Kestrel);
+    ShipDesign design;
+    ShipSpec derived{};
+    void rebuild_from_design(const PartTable &parts);
+    void rebuild_from_design();
     /** A deque, like the fragments: the grid holds pointers into it, so erasing one body
      *  must not move the others. */
     std::deque<Obstacle> rocks = create_obstacles();

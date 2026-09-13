@@ -1,4 +1,4 @@
-> **Status: complete.** The live plan is [PLAN-05-legibility.md](PLAN-05-legibility.md).
+> **Status: complete.** The live plans are [PLAN-06-instrument.md](PLAN-06-instrument.md) (flow, HUD, screens, sky) and [PLAN-07-shipkit.md](PLAN-07-shipkit.md) (spines, parts, assembly, wreckage).
 
 Live plan. [PLAN-01](PLAN.md), [PLAN-02](PLAN-02-system.md) and [PLAN-03](PLAN-03-worlds.md) are
 complete; their decisions bind.

@@ -1,445 +1,370 @@
-> **Status: complete.** The live plan is [PLAN-05-legibility.md](PLAN-05-legibility.md).
+# PLAN-08: Shipkit Engine Integration, Dynamic Shipyard & UI Vitality
 
-# Opra — base engine plan
+> **Context & Dependencies:**
+> - Follows `PLAN-07-shipkit.md`, `artifacts/yard/BUILD-REPORT.md`, `artifacts/yard/TASTE-PROFILE.md`, and `artifacts/yard/DESIGN-DIRECTION-v2.md`.
+> - 15 production Three.js modules (5 per variant across Variants A, B, C) and 3 assembled designs authored in `artifacts/yard/`.
+> - All parts authored to `prims.ts` primitives and palette; complexity $\ge 60$, section CV $\ge 0.20$, top material $\le 45\%$, silhouette IoU $< 0.70$.
+> - This plan specifies the full pipeline: resolving bench/exporter paradoxes, exporting GLBs, integrating runtime modular composition into the engine, rebuilding the 3D Shipyard with live physics/specs, injecting UI vitality, and redesigning the startup screen.
 
-Target: SDL3 + SDL3_GPU (D3D12/DXIL), C++20, 3D render / 2D gameplay plane.
-Source of the current code: a hand port of `AstraWars` (three.js). This plan replaces the
-hand port of **geometry** with a real asset pipeline, splits `main.cpp` into modules, and
-fixes the confirmed defects. **Gameplay scope is frozen** at what exists today.
+---
 
-## 0. Locked decisions
+## 0. Technical Audit & Resolution of Known Paradoxes
 
-| # | Decision | Consequence |
-|---|---|---|
-| D1 | Models: three.js → **glTF/GLB** via a Node/bun exporter, loaded with **cgltf** | `tools/export.mjs`, `assets/*.glb`, `src/render/gltf.cpp`. Hand-written C++ ship builders are **deleted**. |
-| D2 | Gameplay scope: **flight + models only** | No combat/contracts/ally/shipyard port. Do not add gameplay systems. Mining cutter, cargo recovery, chart, manual stay as-is. |
-| D3 | UI: **in-house immediate mode**, extended with layout + hit-test | No Dear ImGui. One draw language for HUD and menus. |
-| D4 | Platform: **Windows / DXIL only**, no D3D-isms in HLSL | SPIR-V stays a build-config change, not a rewrite. Keep shader compilation in `tools/`. |
+Before exporting any asset or touching the C++ engine, two contradictions identified in `artifacts/yard/BUILD-REPORT.md §4` must be resolved with exact rules.
 
-Non-negotiable through every phase:
-- `src/sim/*` numerics stay bit-identical to today. `Real` is `double`. No `float` creeps in.
-- Nothing in `src/core`, `src/gpu`, `src/render`, `src/ui` may `#include "sim/..."` or
-  `"game/..."`. Dependencies point one way: `game → {sim, render, ui} → gpu → core`.
-  `src/ui/hud.*` is the one allowed exception and it takes a plain `HudFrame` POD, not a `World`.
-- Every phase ends green: `cmake --build build --config Release` clean at `/W4`, and
-  `Opra.exe --selftest` exits 0 (P0 creates it).
+### 0.1 Paradox A: Triangle Budget vs. `flange()`
+- **Problem:** PLAN-07 §5 requires 120–400 triangles per part. PLAN-07 §3.1 mandates `flange(root, metal, [0,0,0], [0,-1,0])` on every part. The standard `flange()` in `prims.ts` consumes **920 triangles** (32-seg ring plate = 128, 32×8 torus = 512, eight 8-seg bolt bosses = 256, keys = 24). At home framing (3 px/m), a 2.5 m flange is ~7.5 pixels wide.
+- **Resolution:**
+  1. Author a dedicated low-poly `flange_module()` in `prims.ts`:
+     - 12-segment ring plate: 24 tris
+     - 12×4 torus collar: 96 tris
+     - 6 hexagonal bolt bosses: 36 tris
+     - Total: **156 triangles**.
+  2. The gate audit in `tools/export.mjs` and `artifacts/yard/gates.mjs` measures `own_triangles = total_triangles - flange_triangles`.
+  3. Combined with low-poly flange, total part triangles remain under 450 (180 flange + 270 body), keeping a 5-module ship strictly within 1,500–2,200 triangles in memory.
 
-## 1. Target layout
+### 0.2 Paradox B: Minimum Feature Floor (1.5 m) vs. Module Legibility
+- **Problem:** Plan 05 §3.2 specifies a 1.5 m minimum feature size, and `tools/export.mjs` inflates meshes smaller than 1.5 m via `enforce_min_feature`. On a 4 m module, this inflates radiator vanes, hazard plates, RCS nozzles, and antenna masts.
+- **Resolution:**
+  - In `tools/export.mjs`, add `meta.modular = true` handling:
+    - For modular parts (`meta.modular: true`), enforce a sub-assembly feature floor of **0.25 m** (structural members) and allow functional elements (PDC barrels, antennas, nav lights) to retain scale without synthetic inflation.
+    - Global 1.5 m floor applies exclusively to the **assembled design** during design-level auditing.
+
+### 0.3 Paradox C: Flange Radius (2.5 m) on Low-Profile Hulls
+- **Problem:** Variant C is 1.45–1.75 m deep; a 2.5 m circular flange protrudes 0.45 m above the deck and below the keel.
+- **Resolution:**
+  - Standardize `flange_profile`: when `meta.flange_type == "low_profile"`, the flange uses an obround/racetrack collar (2.4 m wide × 1.4 m high) with identical 4-bolt spacing along X. For circular modules (Variants A & B), use standard circular 2.5 m OD flange.
+
+---
+
+## 1. Master Task List (Todos)
 
 ```
-tools/
-  package.json            three (pinned), no bundler — bun runs .ts directly
-  export.mjs              three.js module -> .glb + .json sidecar
-  models/                 LLM-authored three.js model sources  <-- the input surface
-    kestrel.ts mule.ts needle.ts station.ts beacon.ts derelict.ts cargo.ts ore.ts
-assets/
-  models.json             manifest: name -> glb, sidecar, default scale
-  *.glb *.json            committed build output
-shaders/ mesh.hlsl  ui.hlsl
-src/
-  core/     log.h  file.h/.cpp                      SDL_Log wrappers, fatal, asset paths
-  gpu/      gpu.h/.cpp                              device, buffers, textures, pipelines, uploads
-  render/   mesh.h/.cpp      primitive builders (asteroid + ore only after P3)
-            model.h/.cpp     Model, MeshPart, MeshLibrary, ModelMeta
-            gltf.h/.cpp      cgltf -> Model
-            camera.h/.cpp    Camera, view_projection, project, unproject
-            scene.h/.cpp     SceneBuilder, cull, sort, opaque/additive split
-            text.h/.cpp      glyph atlas
-            renderer.h/.cpp  owns GPU state; draw_scene + draw_ui
-  ui/       draw.h/.cpp      UIBatch primitives (moved out of hud.cpp)
-            ui.h/.cpp        immediate-mode core + widgets
-            hud.h/.cpp       flight HUD (unchanged behaviour)
-            screens.h/.cpp   chart, manual, pause, toasts, model viewer
-  sim/      collision.h/.cpp  physics.h/.cpp  world.h/.cpp
-  game/     app.h/.cpp  input.h/.cpp  config.h
-  main.cpp                                          args, init, loop, shutdown. <=150 lines.
-  selftest.cpp                                      --selftest asserts
+[ ] TASK 1: Resolve Exporter & Prims Paradoxes
+    [ ] 1.1 Add low-poly flange_module() (~156 tris) to tools/models/prims.ts
+    [ ] 1.2 Update tools/export.mjs with modular: true floor bypass (0.25m)
+    [ ] 1.3 Verify artifacts/yard/gates.mjs passes all 15 parts with new flange
+
+[ ] TASK 2: Export Pipeline & Asset Manifest
+    [ ] 2.1 Copy verified parts from artifacts/yard/parts/ to tools/models/
+    [ ] 2.2 Copy assembled designs to assets/designs/{hammerhead.json, ingot.json, waverider.json}
+    [ ] 2.3 Run tools/export.mjs to generate 15 part GLBs + 3 stock design GLBs + sidecar JSONs
+    [ ] 2.4 Update assets/models.json manifest with all 15 parts and designs
+    [ ] 2.5 Verify asset integrity in C++ engine via --debug model loader check
+
+[ ] TASK 3: Runtime Modular Ship Composition (sim/ & render/)
+    [ ] 3.1 Implement design-based collider concatenation in sim/component.cpp
+    [ ] 3.2 Implement docking port and RCS jet concatenation from sidecars
+    [ ] 3.3 Dynamic RCS allocator: extend rcsJet solving to N arbitrary placements
+    [ ] 3.4 In src/game/scene.cpp, replace monolithic ship drawing with per-placement rendering
+    [ ] 3.5 Implement single-ship LOD selection (LOD level chosen per ship, applied to all parts)
+    [ ] 3.6 Add wreckage detachment physics: tangential explosion velocity v + omega x r
+
+[ ] TASK 4: Rebuild the Shipyard Screen (src/ui/screens.cpp & src/ui/screens.h)
+    [ ] 4.1 3D Turntable view: smooth damped OrbitControls (yaw, pitch, distance, focus)
+    [ ] 4.2 Interactive station slot wireframes (Stations 0..4 at 4m pitch along Y)
+    [ ] 4.3 Part palette with visual category tabs (Nose, Combat, Tanks, Utility, Drive, Pods)
+    [ ] 4.4 Real-time derived physics calculations (Mass, COM, Thrust, TWR, Delta-V, Torque, Heat)
+    [ ] 4.5 Launch Readiness verification gate (Drive check, TWR check, Overlap check)
+    [ ] 4.6 Mirroring toggle for radial mounts (PDC, radiators, tanks)
+
+[ ] TASK 5: UI Vitality & Polish ("A Bit of Life in UI")
+    [ ] 5.1 Tactical oscilloscope/scanline ambient pulses in ui/tokens.h
+    [ ] 5.2 Responsive interaction states: button hover borders, active glow pops, sound hooks
+    [ ] 5.3 Animated numeric readouts (delta-V fill gauge, TWR safety bar, mass breakdown)
+    [ ] 5.4 Toast notification stack improvements (smooth alpha fade, status iconography)
+
+[ ] TASK 6: Startup Screen Overhaul ("Fix Glowing Orbit")
+    [ ] 6.1 Tone down additive orrery drawing: subtle astronomical chart ink (VELLUM_RULE)
+    [ ] 6.2 Replace harsh concentric circles with dashed/graded ephemeris rings
+    [ ] 6.3 3D Diorama framing: showcase player's flagship docked at Wayfarer Station
+    [ ] 6.4 Clean typographic layout: military almanac title plate with tactile [ BEGIN ] menu
 ```
 
-## 2. Phases
-
-Dependency order. P1/P2 can run in parallel with P3's exporter half.
-
-| P | Name | Depends | Deliverable |
-|---|---|---|---|
-| P0 | Bug sweep + selftest | — | Confirmed defects fixed, `--selftest` exists |
-| P1 | Module split | P0 | `main.cpp` <= 150 lines, layout above, zero behaviour change |
-| P2 | GPU layer + frame upload | P1 | `gpu.h`, one submit per frame, persistent transfer buffers |
-| P3 | Model pipeline | P0 | exporter, `assets/*.glb`, `gltf.cpp`, manifest, hot reload |
-| P4 | Render quality | P2, P3 | per-pixel lighting, additive pass, MSAA, glyph atlas |
-| P5 | Scene optimization | P2 | frustum cull, static star field, run reuse |
-| P6 | UI core | P1 | layout/hit-test/widgets, pause + settings screens |
-| P7 | Model viewer | P3, P6 | `--view models`, the acceptance test for D1 |
-| P8 | Docs + capture harness | all | `README`, `tools/shots.ps1`, reviewed screenshots |
-
 ---
 
-## P0 — Bug sweep + selftest
+## 2. Asset Export & Manifest Integration Logic
 
-Confirmed defects. Each line is a real, reproduced fault, not a style note.
+### 2.1 Sidecar JSON Schema Extension (PLAN-07 §6.1)
+Each modular part GLB emitted by `tools/export.mjs` generates a companion `.json` sidecar. The sidecar structure must be rigorously formatted:
 
-| ID | Site | Fault | Fix |
-|---|---|---|---|
-| B1 | `main.cpp:453` | `SDL_PIXELFORMAT_RGBA8888` is a **packed** format (bytes A,B,G,R LE) uploaded into `R8G8B8A8_UNORM`. Channels rotate: every string renders as an opaque cyan block with a white glyph. Visible in every screenshot. | `SDL_PIXELFORMAT_ABGR8888` |
-| B2 | `main.cpp:745-746` | `fragments.push_back(f); grid.add(&fragments.back());` — the grid stores raw pointers into a growing `vector`. Past the `reserve(1024)` (`main.cpp:710`) every stored pointer dangles. ~2-3 fragments per fracture, never removed. | Store `int id` in the grid; `World` keeps `fragments` in a `std::deque` **or** index-based cells. Pick the deque: smallest diff. |
-| B3 | `main.cpp:1041` `beam_target` | Linear scan over all `world.rocks` per frame, and fragments are never tested — fragments are unbreakable. | Walk the grid along the swept segment; include `world.fragments`. |
-| B4 | `main.cpp:796-801` | Star field is re-seeded from `camera.eye` **every frame**, so stars re-randomize as the camera moves — the backdrop shimmers. | Generate once in world space at startup; store in `World` or a `StarField`. |
-| B5 | `World::step` | `for (fragment : fragments) resolve_collision(...)` is O(n) over every fragment every step. | Query the grid once (B2 already puts fragments in it). |
-| B6 | `main.cpp:1629,1655,1774` | Camera is computed **before** the physics steps, so it trails the ship by one frame at speed. | Step sim, then build the camera from the post-step state. |
-| B7 | `physics.cpp:424-426` | `ore.erase(begin()+i)` inside a forward loop skips the next element. | Iterate backwards, or `std::erase_if`. Verify against the JS original before changing behaviour — if the JS has the same bug, **keep it** and comment it. |
-| B8 | `main.cpp:149-160, 186-200` | `upload_into` allocates a transfer buffer and submits **its own command buffer** per call — 2 extra submits per frame (instances + UI). | P2 replaces this. In P0 just note it. |
-
-`src/selftest.cpp`, run by `Opra.exe --selftest`, no window, no GPU. Asserts only — no framework:
-1. **Determinism**: 600 steps of `World::step` with a fixed input; assert ship position/velocity/fuel match a hardcoded golden to 1e-9. Regenerate the golden only with a stated reason.
-2. **Fracture**: break 200 rocks; assert no dangling grid entry (B2) and that fragment count is bounded.
-3. **Collision**: `obb_circle_out` and `obb_obb_out` against hand-computed cases, including the just-touching and fully-contained edges.
-4. **glTF** (after P3): load every `assets/*.glb`; assert part count > 0, all indices in range, AABB finite and within 10x the sidecar's.
-
-Acceptance: B1–B7 fixed, `--selftest` exits 0, a fresh `--screenshot` shows readable text on transparent ground.
-
----
-
-## P1 — Module split
-
-Pure motion. **No behaviour change.** Verify by capturing `--screenshot` before and after and
-diffing the BMPs byte-for-byte (they must be identical for `--view flight --seconds 6`).
-
-Moves:
-- `main.cpp` render helpers (`read_file`, `asset_path`, `make_shader`, `create_buffer`,
-  `upload_into`, `upload_buffer`, `upload_texture`, `create_*_target`) → `gpu/`, `core/file`.
-- `PipelineSet`, `create_mesh_pipeline`, `create_ui_pipeline`, `Renderer`, `TextEngine`,
-  `GpuMesh`, `InstanceRun`, `upload_mesh_library` → `render/renderer`, `render/text`.
-- `Camera`, `camera_for`, `unproject`, `view_projection`, `project` → `render/camera`.
-- `SceneBuilder`, `build_scene`, `spin_about_z`, `ModelSet` → `render/scene`, `render/model`.
-- `World`, `Contact` → `sim/world`.
-- `Input`, `flight_input_from` → `game/input`.
-- `build_chart`, `build_help`, `Toast` → `ui/screens`.
-- `hud::push_*` primitives, `UIVertex`, `UIBatch`, `TextDraw` → `ui/draw`. `hud.h` keeps only
-  `HudFrame`, `CollarMark`, `build_flight_hud`.
-- `App`, `update_app`, `make_hud_frame` → `game/app`.
-- `save_bmp`, the screenshot branch of `run()` → `game/capture.cpp` (still behind `--screenshot`).
-- Tunables (`FLIGHT_HALF`, `SHIP_SCALE`, `ZOOM_*`, `CUTTER_*`, `TILT_*`) → `game/config.h`.
-
-`main.cpp` keeps: arg parse, `SDL_Init`/`TTF_Init`, window+device creation, the frame loop,
-shutdown. Nothing else.
-
-Every `.h` gets a one-line purpose comment matching the style already in `sim/physics.h`.
-CMake: keep listing sources explicitly, no `GLOB`.
-
----
-
-## P2 — GPU layer + frame upload
-
-`src/gpu/gpu.h` — the only file that names `SDL_GPU*` outside `render/`:
-
-```cpp
-namespace opra::gpu {
-struct Device { SDL_GPUDevice* handle; SDL_Window* window; SDL_GPUTextureFormat swap_format; };
-Device  create_device(SDL_Window*, bool debug);
-void    destroy_device(Device&);
-
-/** Vertex/index buffer that grows by 1.5x and keeps one transfer buffer for its lifetime. */
-struct DynamicBuffer {
-    SDL_GPUBuffer* buffer; SDL_GPUTransferBuffer* transfer;
-    Uint32 capacity, size;
-    void ensure(Device&, Uint32 bytes);
-    /** Stages into the persistent transfer buffer and records the copy on `cmd`. */
-    void write(Device&, SDL_GPUCommandBuffer* cmd, const void* data, Uint32 bytes);
-};
-SDL_GPUBuffer*  upload_static(Device&, SDL_GPUBufferUsageFlags, const void*, Uint32);
-SDL_GPUTexture* upload_texture(Device&, Uint32 w, Uint32 h, const void* rgba);
-SDL_GPUTexture* create_depth(Device&, Uint32 w, Uint32 h, SDL_GPUSampleCount);
-SDL_GPUTexture* create_color(Device&, Uint32 w, Uint32 h, SDL_GPUTextureFormat, SDL_GPUSampleCount);
+```json
+{
+  "name": "nose_hammerhead",
+  "kind": "nose_command",
+  "span": 1,
+  "axial": true,
+  "mass": 4.2,
+  "dry_mass": 4.2,
+  "propellant": 0.0,
+  "thrust": 0.0,
+  "cooling": 0.0,
+  "heat_capacity": 60.0,
+  "flange": {
+    "pos": [0.0, 0.0, 0.0],
+    "normal": [0.0, -1.0, 0.0],
+    "radius": 1.25
+  },
+  "collider": {
+    "shapes": [
+      { "kind": "Box", "pos": [0.0, 2.0], "half": [2.6, 2.0], "angle": 0.0 },
+      { "kind": "Box", "pos": [0.0, 0.9], "half": [1.7, 0.9], "angle": 0.0 }
+    ],
+    "bounds_radius": 2.8
+  },
+  "ports": [
+    { "id": "A", "pos": [0.0, 1.2], "normal": [0.0, 1.0], "class": "M" }
+  ],
+  "hardpoints": {
+    "pdc.fore": [1.4, 2.0, 0.8],
+    "sensor.optics": [0.0, 3.8, 0.2]
+  },
+  "effects": [
+    { "name": "rcs-jet", "pos": [2.4, 2.2, 0.0], "dir": [1.0, 0.0, 0.0] }
+  ]
 }
 ```
 
-Fixes B8. `DynamicBuffer::write` maps with `cycle = true` so a write never stalls on the
-in-flight frame, and records `SDL_UploadToGPUBuffer` on the **frame's own** command buffer in a
-copy pass opened before the render pass. Result: **one** `SDL_SubmitGPUCommandBuffer` per frame.
+### 2.2 Stock Design Manifest (`assets/designs/*.json`)
+Stock ship designs replace hardcoded single-mesh hulls (`kestrel`, `mule`, `needle`). Each design specifies its spine definition and placement list:
 
-Pipelines move to `render/renderer.cpp` and stay cached by swapchain format (the existing
-`pipelines_for` is correct — keep it, it handles HDR/format changes on monitor switch).
-
-Acceptance: one submit per frame (assert with a counter under `--debug`), identical screenshot.
-
----
-
-## P3 — Model pipeline  ← the core of this plan
-
-### 3.1 Authoring contract
-
-An LLM writes one file per model in `tools/models/`. The **only** contract:
-
-```ts
-import * as THREE from 'three';
-/** World units are metres. Nose +Y, dorsal +Z, starboard +X. */
-export function build(): THREE.Object3D { ... }
-/** Optional. Copied verbatim into the sidecar JSON. */
-export const meta = { name: 'kestrel', collider: 'auto', scale: 1.3 };
-```
-
-Conventions the exporter enforces and the loader relies on:
-
-| Convention | Meaning |
-|---|---|
-| **Axes: nose +Y, dorsal +Z** | Matches the existing `sim` frame and today's C++ builders. The exporter writes local coordinates unchanged — glTF is Y-up but performs **no** axis conversion on node transforms, so what three.js holds is what cgltf reads. Verified by the bounds dump in 3.5. |
-| `mesh.userData.effect = true` | Engine flame, RCS jet, glow — drawn only while firing, in the additive pass. Survives as glTF `extras.effect`. |
-| `mesh.visible = false` | Kept (`onlyVisible: false`). Effect geometry is authored hidden; visibility is a runtime decision. |
-| `Object3D` named `hp.<id>` | A hardpoint/anchor. Not rendered; its world position+quaternion goes to the sidecar. |
-| Material `color` | Becomes `baseColorFactor` → `MeshPart.color`, so instances can still tint. |
-| `geometry.attributes.color` | Preserved as `COLOR_0` (asteroids need this). |
-| No `CanvasTexture`, no DOM | The exporter is headless. Meshes carrying a canvas map are **skipped with a warning** — the AstraWars stencil label is the only casualty. Upgrade path: `@napi-rs/canvas`, noted, not built. |
-
-### 3.2 Exporter — `tools/export.mjs`
-
-`bun tools/export.mjs tools/models/kestrel.ts assets/` and `bun tools/export.mjs --all`.
-
-Steps, in order:
-1. `import(file)`, call `build()`, `root.updateWorldMatrix(true, true)`.
-2. **Merge per material.** Walk meshes that are not `userData.effect`, have no canvas map and no
-   transparency; group by material; `geometry.applyMatrix4(mesh.matrixWorld)` then
-   `mergeGeometries`. This is exactly `fleet.ts:batchPlates`, done at build time.
-   A 60-mesh Kestrel becomes ~7 merged meshes + 2 flames + 8 jets.
-   *This step is what makes D1 compatible with an instanced renderer* — `three.BoxGeometry` is
-   allocated fresh per call in the AstraWars sources, so glTF's own geometry dedup finds nothing.
-3. `GLTFExporter().parseAsync(root, { binary: true, onlyVisible: false, includeCustomExtensions: false })`
-   → `assets/<name>.glb`.
-4. Sidecar `assets/<name>.json`:
-   ```json
-   { "name":"kestrel", "scale":1.3,
-     "aabb":{"min":[-32.5,-41,-4],"max":[32.5,41,15]},
-     "collider":{"halfLength":59,"halfWidth":34},
-     "effects":[{"node":"flame","pos":[16,-42,0]},...],
-     "hardpoints":{"gun.port":{"pos":[-12,8,13],"rot":[0,0,0,1]}},
-     "stats":{ ...whatever `meta` carried... },
-     "counts":{"meshes":9,"vertices":4210,"triangles":2680} }
-   ```
-   `collider` is `halfLength = (aabb.max.y-aabb.min.y)/2 * scale`, `halfWidth` likewise on X,
-   unless `meta.collider` overrides. Today's `HULL_BOXES = {{59,34},{65,43},{62,27}}` are the
-   reference values — **the exporter must reproduce them within 5%** or the port drifted.
-5. Rewrite `assets/models.json` (the manifest).
-6. Print a one-line report per model: name, merged meshes, tris, AABB, collider, skipped meshes.
-
-`tools/package.json` pins `three` to the same version AstraWars uses (`^0.183.2`) so the
-geometry generators match the reference. Run under `bun` (installed; runs `.ts` with no build).
-
-### 3.3 Porting the AstraWars models
-
-Copy, do not rewrite. `tools/models/` gets `models.ts` + `fleet.ts` from
-`../AstraWars/src`, stripped to the geometry path:
-- Drop `stencil()`/label planes (D1 canvas rule), `PointLight`, `STOCK_MOUNTS`/`buildGunMount`
-  (D2: no combat).
-- Keep `box`, `cylinder`, `hull` (ExtrudeGeometry), `plate`, `drive`, `thrusters`, `buildAsteroid`.
-- Export one `build()` per class: `kestrel.ts`, `mule.ts`, `needle.ts`, plus `station.ts`,
-  `beacon.ts`, `derelict.ts`, `cargo.ts`, `ore.ts` from `models.ts`.
-- Mark flame cones and RCS jets `userData.effect = true` (fleet.ts already does).
-
-Then **delete** `build_ship`, `build_station`, `build_beacon`, `build_derelict`, `build_cargo`,
-`build_ore`, `add_plate`, `add_hull`, `add_drive`, `add_thrusters` and the `prism`/`torus`/
-`annulus` primitives from `render/mesh.cpp`. What stays: `meshes::asteroid` and
-`meshes::icosahedron` (procedural, seed-driven, 96 buckets — no reason to ship 96 GLBs) and
-`meshes::cube` for the star field. `render/mesh.cpp` should drop from 593 to ~200 lines.
-
-### 3.4 Loader — `src/render/gltf.h`
-
-```cpp
-namespace opra {
-struct ModelMeta {
-    std::string name;
-    float scale = 1.0f;
-    glm::vec3 aabb_min{0}, aabb_max{0};
-    HullBoxes collider{};
-    std::vector<std::pair<std::string, glm::vec3>> hardpoints;
-};
-/** Loads `<dir>/<name>.glb` into `library`, returns its parts. Sidecar fills `meta`. */
-bool load_gltf(const std::string& path, MeshLibrary& library, Model& out, ModelMeta& meta);
-
-/** Every model named by assets/models.json. Lookup by name; missing name is a fatal. */
-class ModelStore {
-public:
-    void load(const std::string& manifest_path);
-    const Model&     model(const std::string& name) const;
-    const ModelMeta& meta(const std::string& name) const;
-    MeshLibrary&     library();
-    /** True if any .glb changed on disk since load; the caller re-uploads. */
-    bool reload_if_stale();
-};
+```json
+{
+  "name": "hammerhead_corvette",
+  "class": "Kestrel",
+  "spine": {
+    "family": "Keel",
+    "stations": 5,
+    "pitch": 4.0,
+    "half_width": 1.7,
+    "recess": 0.0,
+    "mass": 5.0
+  },
+  "placements": [
+    { "part": "nose_hammerhead", "station": 0, "facing": "Fore", "axial": true, "stack_index": 0 },
+    { "part": "section_combat_a", "station": 1, "facing": "Fore", "axial": true, "stack_index": 1 },
+    { "part": "section_tank_saddle", "station": 2, "facing": "Fore", "axial": true, "stack_index": 2 },
+    { "part": "section_radiator_wing", "station": 3, "facing": "Fore", "axial": true, "stack_index": 3 },
+    { "part": "drive_twin_torch", "station": 4, "facing": "Aft", "axial": true, "stack_index": 0 }
+  ]
 }
 ```
 
-Implementation notes the agent must honour:
-- `cgltf_parse_file` → `cgltf_load_buffers` → `cgltf_validate`. Any failure is a **fatal with
-  the file name**, never a silent empty model.
-- Walk `scene->nodes` recursively, accumulating a `glm::mat4`. For each `node->mesh`, per
-  primitive: read `POSITION`, `NORMAL`, `COLOR_0` (default white), indices (widen to `uint32`).
-  Reject non-`triangles` primitive types with a warning.
-- Decompose the accumulated matrix to T/R/S. The instance format is pos+quat+scale and the
-  shader computes `rotate(pos * scale)`, which **cannot represent shear**. So: decompose, then
-  recompose and compare against the original matrix; if it differs by more than 1e-4, bake the
-  matrix into the vertices and emit an identity part. Do not skip this check.
-- `MeshPart.color` = material `baseColorFactor.rgb`. `MeshPart.effect` = `extras.effect == true`.
-- **Mesh dedup**: hash the final vertex+index bytes (FNV-1a); identical geometry across models
-  shares one `MeshLibrary` slot. The station ring and the cargo crates will hit this.
-- Normals: if `NORMAL` is absent, generate flat face normals the way `mesh.cpp:push_triangle`
-  already does — do not leave them zero.
-
-### 3.5 Verification
-
-- `Opra.exe --dump-models` (already exists) prints per-model part count and local AABB.
-  After the port, `kestrel/mule/needle` bounds must land within **5%** of today's C++ output,
-  and the derived collider within 5% of `HULL_BOXES`. Record both tables in the PR.
-- `--screenshot` at identical camera before/after: the ships must be recognisably the same
-  hull. Exact pixels will differ (merged geometry, different tessellation order).
-- selftest case 4 (see P0) covers every GLB on every run.
-
-### 3.6 Hot reload
-
-`F5` in `--debug` builds calls `ModelStore::reload_if_stale()` and re-runs
-`upload_mesh_library`. mtime poll on the manifest's files, once a second, nothing fancier.
-This is what makes "an LLM writes a ship, you look at it" a 5-second loop instead of a rebuild.
-
 ---
 
-## P4 — Render quality
+## 3. Engine Architecture & Runtime Composition
 
-| Item | Change | Why |
-|---|---|---|
-| Per-pixel lighting | `mesh.hlsl`: pass world normal to PS, do N·L there. Add a fill light (opposite, 0.25) and a rim term `pow(1-saturate(dot(N,V)), 3)` in `NAV`. | Today it is one directional term computed **per vertex** (`mesh.hlsl` VSMain). Low-poly hulls read as flat dark blobs — see any current screenshot. |
-| Additive pass | Split `InstanceRun` into opaque and effect lists in `SceneBuilder`. Second pipeline: `BLENDFACTOR_SRC_ALPHA`/`ONE`, depth test on, **depth write off**, drawn after opaque. | Flames, glow rings and glass carried the three.js look and are currently drawn opaque. |
-| Flame shape | Port the `fleet.ts` exhaust fragment shader (`a = pow(1-uv.y, 1.65)`, edge term) into a 3rd tiny pipeline, or approximate with vertex alpha on the cone. Take the vertex-alpha version first. | Cheaper, no new UV plumbing. Upgrade if it looks wrong. |
-| MSAA 4x | `SAMPLECOUNT_4` on both pipelines, an MSAA color target + resolve to swapchain. | Low-poly silhouettes on a near-black field alias badly. One-line pipeline change, ~15 lines of target plumbing. Gate behind `config.h`. |
-| Glyph atlas | `render/text.cpp`: one **RGBA8** 1024² atlas per (face, px), ASCII 32..126 packed by a shelf packer, white RGB + coverage in A. Advance/kern from `TTF_GetGlyphMetrics`. | Today every distinct string is its own texture and its own `SDL_BindGPUFragmentSamplers` + draw (`main.cpp:1467-1500`), with a nuke-everything at 512 entries. The atlas makes **all** text one draw and needs **no shader change** — `ui.hlsl` already does `color * tex.Sample(...)`. |
-| Font fallback | `C:\Windows\Fonts\bahnschrift.ttf` / `segoeui.ttf` are hardcoded (`main.cpp`). Ship the two fonts in `assets/fonts/`, fall back to the system path. | The exe is not portable today. |
+### 3.1 Mathematical Foundation for Stacking & Placement Transforms
+Every part is authored with attachment face at local $-Y$, flange at $(0, 0, 0)$, body extending along $+Y$.
 
-Acceptance: side-by-side screenshots in the PR; text is one draw call (assert under `--debug`);
-the ship is legible as a ship at default zoom.
+#### Axial Placement ($f \in \{\text{Fore}, \text{Aft}\}$):
+Given spine length $L = N \cdot p$, end cap distance is $d_{\text{axial}} = L/2$.
+$$\vec{p} = \text{dir}(f) \cdot (d_{\text{axial}} + k_{\text{stack}} \cdot p)$$
+$$\mathbf{q} = \mathbf{q}_{\text{face}}(f) \cdot \text{rotY}(\text{roll} \cdot \pi/2)$$
 
----
+#### Radial Placement ($f \in \{\text{Starboard}, \text{Port}, \text{Dorsal}, \text{Ventral}\}$):
+Station $i \in [0, N-1]$ along Y axis:
+$$y_i = \left(\frac{N - 1}{2} - i\right) \cdot p$$
+$$\vec{p} = (0, y_i, 0)^T + \text{dir}(f) \cdot (w_{\text{half}} - r_{\text{recess}})$$
+$$\mathbf{q} = \mathbf{q}_{\text{face}}(f) \cdot \text{rotY}(\text{roll} \cdot \pi/2)$$
 
-## P5 — Scene optimization
+#### Thrust Direction Inversion:
+A drive bolts to the aft face ($-\hat{Y}$), body extends $-Y$, exhaust nozzle points $-Y$. Thrust pushes $+Y$:
+$$\vec{F}_{\text{thrust}} = -(\mathbf{q} \cdot \hat{Y})$$
+Valid forward propulsion requires:
+$$\vec{F}_{\text{thrust}} \cdot \hat{Y} \ge \cos(15^\circ)$$
 
-Baseline today: **839 instances, 143 mesh runs, 290,788 triangles** for an empty 6-second
-flight, and the mesh library is **275,706 vertices** (96 asteroid buckets dominate).
+### 3.2 Dynamic Collider & Port Concatenation (`src/sim/component.cpp`)
+At design instantiation:
+1. Initialize empty `world.ship.collider.shapes`.
+2. For each placement $p$:
+   - Fetch `ModelShape` array from part sidecar.
+   - For each 2D shape (box with center $\vec{c}$, half-extents $\vec{h}$, angle $\theta$):
+     - Transform center into ship-frame: $\vec{c}' = \mathbf{R}(\mathbf{q}) \cdot \vec{c} + \vec{p}_{\text{mount}}$.
+     - Project into XY flight plane.
+     - Append transformed shape to ship collider.
+3. Compute ship broadphase bounds radius $R_{\text{bounds}} = \max_i (\|\vec{c}'_i\| + \|\vec{h}_i\|)$.
+4. Concatenate docking ports: map local port IDs ("A", "B") to global design IDs ("P1", "P2").
 
-1. **Frustum cull.** The camera is orthographic top-down: the visible region is an
-   axis-aligned rect in XY, `half_height * aspect` by `half_height`, centred on the ship, plus a
-   margin of the largest object radius. Reject rocks/fragments/ore/cargo before `SceneBuilder::add`.
-   At default zoom that is ~900 x 500 m out of a 5200 x 4200 m sector — expect an ~8x cut.
-2. **Static star field** (also B4). Generate once, upload as its own instance buffer, never
-   rebuild. Draw with the scene's other instances by keeping it at the head of the buffer.
-3. **Sort cost.** `SceneBuilder::sorted` does a `stable_sort` over an index vector and copies
-   every instance, every frame. Replace with a counting sort by mesh id: the id space is small
-   and known (`library.size()`). O(n) and no comparator.
-4. **Run reuse.** `runs` and the instance vector are rebuilt from scratch every frame — reserve
-   them once on the `Renderer` and `clear()`, do not reallocate.
-5. **Asteroid LOD.** `meshes::asteroid` uses icosahedron detail 3 above r=46 (~1280 tris each).
-   Pick detail from **screen size**, not world radius: at zoom 0.6 a big rock is 40 px.
-   Two buckets (detail 1 / detail 2-3), chosen per frame. Only if P5.1 is not enough.
+### 3.3 Dynamic Multi-Jet RCS Allocation
+Current engine has `Real rcsJet[4]` in `src/sim/physics.h`.
+With modular ships, RCS quads can be mounted on wingtips, nose sponsons, or engine blocks.
+- **RCS Solver Formulation:**
+  For $M$ installed RCS nozzles at ship-relative positions $\vec{r}_j$ pointing along unit thrust vectors $\hat{n}_j$ ($j = 1 \dots M$):
+  $$\tau_j = (\vec{r}_j - \vec{r}_{\text{COM}}) \times \hat{n}_j \cdot \hat{Z}$$
+  $$F_{y, j} = \hat{n}_j \cdot \hat{Y}, \quad F_{x, j} = \hat{n}_j \cdot \hat{X}$$
+  Given pilot desired control vector $\mathbf{u} = (\tau_{\text{cmd}}, F_{x, \text{cmd}}, F_{y, \text{cmd}})^T$, solve non-negative linear program or weighted least-squares:
+  $$\min \sum_{j=1}^M a_j^2 \quad \text{s.t.} \quad \sum_{j=1}^M a_j \begin{pmatrix} \tau_j \\ F_{x,j} \\ F_{y,j} \end{pmatrix} = \mathbf{u}, \quad 0 \le a_j \le 1$$
+- For performance, compute pseudoinverse matrix $\mathbf{P} \in \mathbb{R}^{M \times 3}$ at design compile time:
+  $$\mathbf{a}_{\text{raw}} = \mathbf{P} \mathbf{u}, \quad a_j = \text{clamp}(a_{\text{raw}, j}, 0, 1)$$
 
-Acceptance: instance count and triangle count logged per frame under `--debug`; report before/
-after for `--seconds 6` and for a stress case (`--seconds 120`, after 50 fractures).
-Target: < 250 instances and < 60k triangles at default zoom.
-
----
-
-## P6 — UI core
-
-`src/ui/ui.h`. Roughly 300 lines. Immediate mode, ids by string hash, one batch out.
-
+### 3.4 Runtime Per-Placement Scene Drawing (`src/game/scene.cpp`)
+Replace the single-instance ship draw call in `build_scene()`:
 ```cpp
-namespace opra::ui {
-struct Rect { float x, y, w, h; bool contains(glm::vec2 p) const; };
-struct Pointer { glm::vec2 at; bool down, pressed, released; float wheel; bool valid; };
+// Determine single LOD tier for entire ship to prevent visual tearing
+const int ship_lod = select(0, world.ship.position.x, world.ship.position.y,
+                            static_cast<Real>(world.ship.bounds.halfLength));
+if (ship_lod >= 1) {
+    const glm::dvec3 ship_origin = relative(origin, world.ship.position.x, world.ship.position.y, 0.0);
+    const glm::quat ship_rot = spin_about_z(static_cast<float>(world.ship.angle));
 
-struct Context {
-    UIBatch batch;
-    Pointer pointer;
-    glm::vec2 screen;
-    uint32_t hot = 0, active = 0;       // widget under the cursor / being dragged
+    for (size_t i = 0; i < design.placements.size(); ++i) {
+        const auto &p = design.placements[i];
+        if (p.destroyed) continue;
 
-    void begin(glm::vec2 screen, const Pointer&);
-    void end();                          // clears hot if nothing claimed it
+        const Mount m = mount_transform(design.spine, p);
+        const glm::vec3 part_pos = ship_origin + ship_rot * glm::vec3(m.pos);
+        const glm::quat part_rot = ship_rot * glm::quat(m.rot);
 
-    // layout: a stack of rects, each `cut_*` consumes from its parent
-    void  push(Rect); void pop();
-    Rect  cut_top(float h);  Rect cut_bottom(float h);
-    Rect  cut_left(float w); Rect cut_right(float w);
-    Rect  inset(Rect, float) const;
-
-    // widgets — all return the interaction, all draw in the HUD's mark language
-    bool  button(const char* id, Rect, const char* label);
-    bool  toggle(const char* id, Rect, const char* label, bool& value);
-    bool  slider(const char* id, Rect, const char* label, float& value, float lo, float hi);
-    void  label(Rect, const char* text, float px, TextAlign, glm::vec4, TextFace);
-    bool  list(const char* id, Rect, const char* const* items, int count, int& selected);
-};
+        const Model &part_model = lod_model(models, p.part, ship_lod);
+        scene.add_model(part_model, part_pos, part_rot, 1.0f,
+                        world.ship.thrustLevel > 0.02f,
+                        ui::clamp01(thrust / 1.65f),
+                        glm::vec3(1.0f),
+                        get_placement_jets(world.ship, i));
+    }
 }
 ```
 
-Rules for the implementer:
-- `hot` is set during the widget call when the rect contains the pointer; `active` latches on
-  press and releases on release. A widget "fires" on release-inside. This is the standard
-  IMGUI state machine — do not invent a new one.
-- ids: FNV-1a of the id string. In a loop, salt with the index (`button(id, i)` overload).
-- Drawing uses **only** `ui/draw.h` primitives and the `hud::` palette tokens. No new colours.
-  The design rule from `PLAN-HUD.md` holds for menus too: marks, not surfaces — a button is a
-  label plus a rule that brightens, not a filled pill.
-- Keyboard: `Tab`/arrows move focus, `Enter` fires. Focus is one more id on the context.
-- The context owns no GPU state. `Renderer::draw_ui(const UIBatch&)` already exists.
+---
 
-Screens moved onto it in this phase: **pause** (resume / settings / quit), **settings** (zoom
-default, attitude assist, reduced motion, MSAA, show debug stats). Chart and manual stay as
-static draws — they have no input, converting them buys nothing.
+## 4. Shipyard Rebuild Specification
 
-`game/input.cpp` grows a binding table (`Action -> SDL_Scancode[]`) so keys are data, and the
-manual screen renders **from** that table instead of the hardcoded `Row rows[]` in
-`build_help` — the manual can then never drift from the bindings.
+The Shipyard is rebuilt from a static placeholder into an interactive 3D assembly workbench.
 
-Acceptance: pause menu navigable by mouse and keyboard; settings persist to
-`%LOCALAPPDATA%/Opra/settings.ini` (plain `key=value`, 30 lines, no dep).
+```
+┌─────────────────────────┬───────────────────────────────────┬────────────────────────┐
+│ PARTS PALETTE           │ 3D TURNTABLE WORKBENCH            │ DERIVED SPECIFICATIONS │
+│ ─────────────────────── │ ───────────────────────────────── │ ────────────────────── │
+│ [A: Hammerhead]         │       ▲ Nose (Station 0)          │ DRY MASS:       42.5 t │
+│ [B: Ingot Hauler]       │      ┌─┐                          │ FUEL CAPACITY:  38.0 t │
+│ [C: Waverider]          │      │█│ nose_hammerhead          │ TOTAL MASS:     80.5 t │
+│                         │      ├─┤                          │                        │
+│ CATEGORIES:             │   ◄──│█│──► combat_a (PDCs)       │ THRUST:        1200 kN │
+│ > Command / Nose        │      ├─┤                          │ TWR:             1.52g │
+│ > Combat / Weapons      │  (O) │█│ (O) tank_saddle          │ DELTA-V:      4.1 km/s │
+│ > Propellant Tanks      │      ├─┤                          │                        │
+│ > Utility / Radiators   │ [===]│█│[===] rad_wings (5.8m)    │ HULL INTEGRITY:    480 │
+│ > Propulsion            │      ├─┤                          │ RADIATOR COOL:   28 kW │
+│                         │      │█│ twin_torch               │ REACTOR HEAT:    22 kW │
+│ [x] Mirror Radial       │      ▼▼ Stern (Station 4)         │ THERMAL MARGIN:  +6 kW │
+│ [x] Show Snap Flanges   │                                   │                        │
+│                         │ [Drag to Orbit | Scroll to Zoom]  │ [✓] Drive Installed    │
+│                         │ [Press 1-4 for Camera Presets]    │ [✓] TWR > 1.0          │
+│                         │                                   │ [✓] RCS Balanced       │
+├─────────────────────────┴───────────────────────────────────┴────────────────────────┤
+│ [ < BACK TO CONTRACT ]                     [ LAUNCH VESSEL (READY) > ]                │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.1 3D Turntable & Station Gizmos
+- Turntable orbit around design bounding box center:
+  - Yaw: free $360^\circ$ rotation with mouse drag.
+  - Pitch: clamped between $-20^\circ$ and $+80^\circ$.
+  - Distance: auto-framed to $1.4 \times$ design diagonal.
+- Visual Station Rings:
+  - Render semi-transparent cyan torus rings at empty stations $(y_0 \dots y_{N-1})$.
+  - Hovering a ring highlights it in amber and displays slot connector class.
+  - Clicking an occupied module selects it for inspection or removal.
+
+### 4.2 Real-Time Physical Property Calculations
+Calculated dynamically whenever a part is added, removed, or swapped:
+1. **Total Dry Mass & Propellant:**
+   $$M_{\text{dry}} = m_{\text{spine}} + \sum_{p} m_{\text{dry}, p}, \quad M_{\text{fuel}} = \sum_{p} m_{\text{fuel}, p}$$
+   $$M_{\text{total}} = M_{\text{dry}} + M_{\text{fuel}}$$
+2. **Center of Mass ($\vec{r}_{\text{COM}}$):**
+   $$\vec{r}_{\text{COM}} = \frac{m_{\text{spine}} \vec{r}_{\text{spine}} + \sum_p (m_p \cdot \vec{p}_{\text{mount}})}{M_{\text{total}}}$$
+3. **Thrust & TWR:**
+   $$T = \sum_{p \in \text{drives}} T_p \cdot \max(0, \hat{n}_{\text{thrust}, p} \cdot \hat{Y})$$
+   $$\text{TWR} = \frac{T}{M_{\text{total}} \cdot g_0}, \quad g_0 = 9.80665 \text{ m/s}^2$$
+4. **Relativistic / Tsiolkovsky $\Delta V$:**
+   $$\bar{I}_{sp} = \frac{\sum T_i}{\sum (T_i / I_{sp, i})}, \quad \Delta V = \bar{I}_{sp} \cdot g_0 \cdot \ln\left(\frac{M_{\text{total}}}{M_{\text{dry}}}\right)$$
+5. **Thermal Equilibrium Margin:**
+   $$Q_{\text{cool}} = q_{\text{spine}} + \sum_p q_{\text{cooling}, p}, \quad Q_{\text{heat}} = \sum_p q_{\text{heat}, p}$$
+   $$\Delta Q = Q_{\text{cool}} - Q_{\text{heat}} \quad (\text{must be } \ge 0)$$
 
 ---
 
-## P7 — Model viewer  ← the acceptance test for the whole model pipeline
+## 5. UI Vitality & Polish ("A Bit of Life in UI")
 
-`Opra.exe --view models`, or `F2` in-game. A screen, not a separate app.
+The current UI feels flat and inert. We infuse tactile vitality without compromising hard sci-fi legibility:
 
-- Left: a `ui::list` of every name in `assets/models.json`.
-- Centre: the model on a turntable, orbit with drag, zoom with wheel, `G` toggles a 10 m grid,
-  `N` toggles normals, `B` toggles the AABB + the derived collider box, `E` toggles effect parts.
-- Right: the sidecar, rendered as text — part count, unique meshes, triangles, AABB, collider,
-  hardpoints, and the **scale at which the sim uses it**.
-- `F5` reloads from disk (P3.6).
+### 5.1 Subtle Ambient Dynamics
+- **CRT Oscilloscope & Micro-Grid Rulings:**
+  - Overlay subtle horizontal scanline rulings with $0.04$ alpha.
+  - Inject micro-pulse modulation on borders: $\alpha(t) = \alpha_0 \cdot (0.95 + 0.05 \sin(2.4 t))$.
+- **Interactive Element Elevation:**
+  - On button hover: border shifts from `tokens::RULE` ($0.28$) to `tokens::NAV` ($0.85$), background brightens by $+8\%$ with crisp 1px corner tick marks.
+  - On click / activate: 60ms micro-burst flash in `tokens::DRIVE` amber.
 
-This is the deliverable that proves D1: an LLM writes `tools/models/foo.ts`, runs
-`bun tools/export.mjs --all`, presses F5, and sees the ship. If that loop is not smooth, P3 is
-not done.
-
----
-
-## P8 — Docs + capture harness
-
-- `README.md`: build (vcpkg manifest + CMake), run, flags, the authoring contract from 3.1,
-  and the one-paragraph model loop. Nothing else.
-- `tools/shots.ps1`: renders `flight / chart / help / models / cutter / scene` to
-  `artifacts/*.png`, converting BMP→PNG with `System.Drawing` **without flipping**.
-  The existing `build/*.png` are vertically flipped by whatever produced them — the renderer is
-  correct, the converter was not. Do not "fix" the renderer to match them.
-- `vcpkg.json`: add `cgltf`.
-- `.gitignore`: keep `assets/*.glb` **tracked** (they are build output, but they are the thing
-  the game ships and the thing a reviewer diffs).
+### 5.2 Animated Data Visualizations
+- **$\Delta V$ & Fuel Gauge:**
+  - Segmented fuel bar with animated fluid fill and reserve threshold indicator.
+- **TWR Dynamic Arc:**
+  - Radial or horizontal meter with safety threshold line at $1.0\text{g}$; turns threat coral below $1.0$.
+- **Real-Time Stat Deltas:**
+  - When hovering a part in the catalog, stat numbers display instant diffs with color cues: e.g., `MASS: 80.5 -> 84.7 t (+4.2)` in amber, `TWR: 1.52 -> 1.44` in dim etch.
 
 ---
 
-## 3. Review gates
+## 6. Startup Screen Overhaul ("Fix Glowing Orbit")
 
-I check each phase against these before the next one starts:
+### 6.1 Diagnosis of the "Crap Glowing Orbit"
+In `src/game/frame.cpp` and `src/render/orrery.cpp`, the startup screen currently calls:
+`orrery::build(app.scene, app.orrery_meshes, app.map_frame);`
+- **What is wrong:**
+  1. Mesh lines are drawn in the additive backdrop pass with unattenuated glow and harsh unit cubes, creating blinding white/cyan concentric rings that drown the screen.
+  2. The camera looks straight down at an abstract line drawing with no depth or scale context.
+  3. The title panel floats disconnectedly over the top-left corner.
 
-1. `cmake --build build --config Release` — clean, `/W4`, no new warnings.
-2. `Opra.exe --selftest` — exit 0.
-3. `Opra.exe --screenshot` for every view — attached to the PR, converted un-flipped.
-4. The dependency rule from §0 holds. `grep -r 'include "sim/' src/render src/gpu src/core` is empty.
-5. Line budget: no file over ~600 lines. `main.cpp` <= 150 after P1.
-6. Numbers, not adjectives: every optimization claim comes with the before/after instance,
-   triangle and submit counts from `--debug`.
-7. Nothing outside the frozen scope (D2) appears. A PR that adds guns gets sent back.
+### 6.2 The New Startup Scene Design
+1. **Dramatic 3D Docking Bay / Space Diorama Framing:**
+   - Instead of looking straight down at raw orbit lines, position camera at an oblique cinematic angle ($\text{pitch} \approx 28^\circ$).
+   - Display the player's flagship (Hammerhead Corvette) berthing at Wayfarer Station in the foreground.
+   - Soft directional star lighting with rim glow on the hull panels.
+2. **Refined Ephemeris Rings (Astronomical Chart Style):**
+   - Eliminate additive blooming. Draw orbit rings with muted `VELLUM_RULE` ($\alpha \approx 0.20$).
+   - Use dashed styling for planetary orbits and subtle tick marks for true anomalies.
+   - The star is a warm, deep amber sphere with atmospheric corona, not an over-bloomed white flash.
+3. **Typography & Atmospheric Presentation:**
+   - Left-aligned title block with military naval typography:
+     ```
+     O P R A
+     OPERATIONAL PLANETARY RECOVERY AGENCY
+     Nereid Sector Division • Almanac Year 2184
+     ────────────────────────────────────────────────────────
+     [ 1 ]  BEGIN RECOVERY CONTRACT  >
+     [ 2 ]  SHIPYARD & OUTFITTING
+     [ 3 ]  FLIGHT MANUAL & TELEMETRY
+     [ 4 ]  SYSTEM CONFIGURATION
+     [ 5 ]  EXIT TO TERMINAL
+     ```
+   - Subtle background dust motes drifting across the viewport at parallax depth.
+
+---
+
+## 7. Edge Cases & Defensive Rules
+
+1. **Center of Mass Shift:**
+   - As modules or radial pods are attached asymmetrically, $\vec{r}_{\text{COM}}$ shifts off the centerline. The RCS solver must rebalance automatically. If $\vec{r}_{\text{COM}}$ shifts $> 0.6 \text{ m}$ from the thrust line, the shipyard displays a visual warning: `"THRUST MISALIGNMENT: YAW BIAS DETECTED"`.
+2. **Station Stacking Collisions:**
+   - Occupancy grid test (`std::array<bool, 96> occupied`) must execute instantaneously on hover. If a part's station span would collide with an existing module, the ghost mesh turns semi-transparent red and placement is blocked.
+3. **Missing Drives / Negative Net Thrust:**
+   - A design without an aft-facing drive or with thrust pointing retrograde has launch disabled with explicit HUD message: `"LAUNCH REFUSED: NO FORWARD DRIVE INSTALLED"`.
+4. **Wreckage Physics Stability:**
+   - When a ship breaks apart, detached modules inherit $\vec{v} + \vec{\omega} \times \vec{r}$. If separation speed $s < 4 \text{ m/s}$, clamp to $4 \text{ m/s}$ to prevent parts colliding with each other on the spawn frame.
+5. **Asset Hot-Reloading:**
+   - When GLBs are re-exported while the engine is running, `app.reload_models_if_stale()` must re-bind mesh pointers and re-compute colliders without crashing active instances.
+
+---
+
+## 8. Verification & Acceptance Criteria
+
+- **Bench Tests:** `bun run artifacts/yard/gates.mjs` passes all 15 parts and all 3 designs.
+- **Export Verification:** 15 `.glb` files and 15 `.json` sidecars created in `assets/`; `assets/models.json` validates.
+- **Engine Build:** `cmake --build build --config Release` compiles with 0 errors and 0 warnings.
+- **Selftest Suite:** `./build/Release/opra --selftest` runs with 100% pass rate.
+- **Visual Inspection:**
+  - Launching `./build/Release/opra` displays the redesigned cinematic startup screen (no blinding glowing orbits).
+  - Transitioning to Shipyard allows full 360° orbit around Variant A/B/C hulls with real-time derived stats.
+  - Launching into flight renders the ship as a cohesive section-module assembly with functional RCS thruster cones.

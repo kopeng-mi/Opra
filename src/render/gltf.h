@@ -3,6 +3,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,6 +43,24 @@ struct ModelPort {
     char size_class = 'M';
 };
 
+/** Sidecar part block for modular components (§6.3, §7.3). */
+struct ModelPart {
+    std::string kind;
+    int span = 1;
+    bool axial = true;
+    bool modular = true;
+    double mass = 0;        // kg
+    double propellant = 0;  // kg
+    double thrust = 0;      // N
+    double cooling = 0;
+    double heat_capacity = 0;
+    int rcs_jets = 0;
+    double rcs_authority = 0;
+    glm::vec3 flange_pos{0.0f};
+    glm::vec3 flange_normal{0.0f, -1.0f, 0.0f};
+    float flange_radius = 1.25f;
+};
+
 /** What the exporter measured about a model, and what the sim needs from it. */
 struct ModelMeta {
     std::string name;
@@ -66,6 +85,7 @@ struct ModelMeta {
     int triangle_count = 0;
     /** The name of the effect nodes the sidecar lists. */
     std::vector<std::string> effect_nodes;
+    std::optional<ModelPart> part;
 };
 
 /** Loads `<path>` into `library` and returns its parts. A malformed file is fatal. */
@@ -85,6 +105,7 @@ public:
 
     const Model &model(const std::string &name) const;
     const ModelMeta &meta(const std::string &name) const;
+    bool has(const std::string &name) const { return models_.find(name) != models_.end(); }
 
     /** True if any .glb, sidecar or the manifest changed on disk since load. */
     bool stale() const;

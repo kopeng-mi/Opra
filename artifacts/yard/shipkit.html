@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Opra Shipkit — Production Hulls (3 Variants)</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0a0e13;
+      color: #d1d8e0;
+      overflow: hidden;
+      user-select: none;
+      width: 100vw;
+      height: 100vh;
+    }
+    #prototype-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Top Header Bar */
+    .top-bar {
+      position: absolute;
+      top: 20px;
+      left: 24px;
+      right: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #6be7ff;
+      background: rgba(107, 231, 255, 0.1);
+      border: 1px solid rgba(107, 231, 255, 0.3);
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .main-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #7b8a97;
+      margin-top: 2px;
+    }
+
+    /* Info Sidebar Card */
+    .info-card {
+      position: absolute;
+      top: 80px;
+      left: 24px;
+      width: 380px;
+      background: rgba(16, 22, 30, 0.88);
+      border: 1px solid rgba(50, 72, 94, 0.6);
+      backdrop-filter: blur(16px);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
+      pointer-events: auto;
+    }
+    .variant-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      background: rgba(8, 12, 16, 0.6);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px 10px;
+      background: transparent;
+      border: none;
+      color: #8c9ba8;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .tab-btn.active {
+      background: #1f6feb;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(31, 111, 235, 0.4);
+    }
+    .info-header {
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+    .info-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+    .info-subtitle {
+      font-size: 12px;
+      color: #6be7ff;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 2px;
+    }
+    .info-desc {
+      font-size: 13px;
+      color: #a2b2c0;
+      line-height: 1.45;
+      margin-bottom: 16px;
+    }
+    .spec-table {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      background: rgba(8, 12, 16, 0.5);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      margin-bottom: 16px;
+    }
+    .spec-row {
+      display: flex;
+      justify-content: space-between;
+    }
+    .spec-label {
+      color: #6b7c8c;
+      font-weight: 500;
+    }
+    .spec-val {
+      color: #e2e8f0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 600;
+    }
+    .highlights-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #7b8a97;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .highlights-list {
+      list-style-type: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .highlights-list li {
+      font-size: 12px;
+      color: #cbd5e1;
+      padding-left: 14px;
+      position: relative;
+      line-height: 1.35;
+    }
+    .highlights-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #6be7ff;
+      font-weight: bold;
+    }
+
+    /* Top Right Camera View Selector */
+    .view-controls {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      display: flex;
+      gap: 8px;
+      background: rgba(16, 22, 30, 0.85);
+      border: 1px solid rgba(50, 72, 94, 0.6);
+      backdrop-filter: blur(12px);
+      padding: 6px;
+      border-radius: 10px;
+      pointer-events: auto;
+    }
+    .view-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: #8c9ba8;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .view-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .view-btn.active {
+      background: rgba(107, 231, 255, 0.12);
+      border-color: rgba(107, 231, 255, 0.35);
+      color: #6be7ff;
+    }
+
+    /* Floating Bottom Switcher Bar (Skill Prototype Pattern) */
+    .bottom-bar-container {
+      position: absolute;
+      bottom: 28px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(14, 20, 28, 0.94);
+      border: 1px solid rgba(107, 231, 255, 0.3);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.8), 0 0 24px rgba(107, 231, 255, 0.15);
+      padding: 8px 14px;
+      border-radius: 50px;
+      pointer-events: auto;
+      backdrop-filter: blur(20px);
+    }
+    .nav-arrow {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(255, 255, 255, 0.06);
+      color: #ffffff;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .nav-arrow:hover {
+      background: #1f6feb;
+      border-color: #1f6feb;
+      transform: scale(1.05);
+    }
+    .nav-arrow:active {
+      transform: scale(0.95);
+    }
+    .pill-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 220px;
+      text-align: center;
+      padding: 0 8px;
+    }
+    .pill-key {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: #6be7ff;
+    }
+    .pill-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-top: 1px;
+    }
+    .pill-hint {
+      font-size: 10px;
+      color: #6c7d8c;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="prototype-canvas"></canvas>
+
+  <div class="top-bar">
+    <div>
+      <span class="badge">Opra Shipkit — Production Parts</span>
+      <h1 class="main-title">Section-Module Production Hulls</h1>
+      <p class="subtitle">Comparing 3 radically distinct silhouettes from the 32° game oblique camera.</p>
+    </div>
+  </div>
+
+  <!-- Camera presets -->
+  <div class="view-controls">
+    <button class="view-btn active" data-view="game_oblique">🎯 Game View (32° Oblique)</button>
+    <button class="view-btn" data-view="plan">📐 Plan Top (90°)</button>
+    <button class="view-btn" data-view="perspective">🎲 Perspective (Iso)</button>
+    <button class="view-btn" data-view="side">📏 Side Profile</button>
+    <button class="view-btn" id="btn-rotate">🔄 Turntable</button>
+  </div>
+
+  <!-- Info Sidebar Card -->
+  <div class="info-card">
+    <div class="variant-tabs">
+      <button class="tab-btn active" data-key="A">Variant A</button>
+      <button class="tab-btn" data-key="B">Variant B</button>
+      <button class="tab-btn" data-key="C">Variant C</button>
+    </div>
+
+    <div class="info-header">
+      <h2 class="info-title" id="info-title">Loading...</h2>
+      <div class="info-subtitle" id="info-subtitle">...</div>
+    </div>
+
+    <p class="info-desc" id="info-desc">...</p>
+
+    <div class="spec-table">
+      <div class="spec-row">
+        <span class="spec-label">Envelope</span>
+        <span class="spec-val" id="info-dim">-</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-label">Widest Span</span>
+        <span class="spec-val" id="info-span">-</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-label">Silhouette</span>
+        <span class="spec-val" id="info-silhouette">-</span>
+      </div>
+      <div class="spec-row">
+        <span class="spec-label">Archetype</span>
+        <span class="spec-val" id="info-archetype">-</span>
+      </div>
+    </div>
+
+    <div class="highlights-title">Anatomy & Key Features</div>
+    <ul class="highlights-list" id="info-highlights"></ul>
+  </div>
+
+  <!-- Floating Bottom Switcher (Prototype Standard) -->
+  <div class="bottom-bar-container">
+    <div class="bottom-bar">
+      <button class="nav-arrow" id="btn-prev" title="Previous Variant (←)">←</button>
+      <div class="pill-content">
+        <div class="pill-key" id="variant-pill-key">Variant A</div>
+        <div class="pill-name" id="variant-pill-name">Hammerhead Submarine</div>
+        <div class="pill-hint">Use ← / → keys to cycle variants | 1-4 for camera views</div>
+      </div>
+      <button class="nav-arrow" id="btn-next" title="Next Variant (→)">→</button>
+    </div>
+  </div>
+
+  <script type="module" src="shipkit_bundle.js"></script>
+</body>
+</html>

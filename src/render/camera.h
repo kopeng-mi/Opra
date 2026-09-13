@@ -60,6 +60,7 @@ struct Camera {
     /** Half the visible height at the target plane: the zoom control, metres. Ten decades of it. */
     double half_height = HOME_HALF;
     float aspect = 16.0f / 9.0f;
+    glm::vec3 up{0.0f, 1.0f, 0.0f};
 
     /** R = half_height / tan(fov_y / 2): the eye's distance from the target plane. */
     double eye_distance() const;

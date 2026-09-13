@@ -74,17 +74,10 @@ struct ShipState {
     Collider collider{};
     /** Axis-aligned extents of `collider` about the hull origin, for the collar and the muzzle. */
     HullBoxes bounds{};
-    /**
-     * Per-jet RCS authority, 0..1, from this step's torque solution. Indexed by (starboard bit) |
-     * (fore bit): [starboard-fore, port-fore, starboard-aft, port-aft] - the four corners the
-     * exporter mounts `rcs-jet` cones on. Each jet fades on its own contribution, so the pilot can
-     * see which jets the sim fired.
-     *
-     * ponytail: four ideal corners at unit moment arm. The sim never reads the model's pod offsets,
-     * so a hull whose jets are not on the corners still lights them by quadrant. Upgrade path: the
-     * exporter's jet positions in the sidecar, the same way the collider shapes arrive.
-     */
-    Real rcsJet[4] = {0, 0, 0, 0};
+    /** Per-jet RCS authority, 0..1, from this step's torque solution. */
+    std::vector<Real> rcsJet = {0, 0, 0, 0};
+    /** Mount arms relative to COM for modular ships (PLAN-08 §3.6, §7.5). */
+    std::vector<Vec2> rcsArms;
     /**
      * Per-component damage (plan 05 s5.4): the fraction of main thrust a drive-pod hit has cost
      * (0..1), and the propellant a tank hit is venting, kilograms per second. `apply_ship_damage`

@@ -49,7 +49,7 @@ void run_loop(App &app, bool debug, int frame_limit) {
         }
 
         set_phase("step simulation");
-        if (app.screen != ui::Screen::Flight) {
+        if (app.current() != ui::Screen::Flight) {
             accumulator = 0.0;
         } else if (app.warp.railed()) {
             const FlightInput flight = flight_input_from(app.input);

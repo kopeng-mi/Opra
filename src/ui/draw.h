@@ -57,4 +57,8 @@ void push_disc(UIBatch &batch, const glm::vec2 &centre, float radius, const glm:
 void push_text(UIBatch &batch, const char *text, float px, const glm::vec2 &at, TextAlign align,
                const glm::vec4 &color, TextFace face = TextFace::Readout);
 
+/** 8-segment meter bar with 1 px threshold tick (PLAN-08 §9.3). */
+void draw_meter(UIBatch &batch, const struct Rect &at, float value, float threshold,
+                const glm::vec4 &ink);
+
 }  // namespace opra::ui

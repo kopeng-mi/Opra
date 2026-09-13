@@ -75,21 +75,21 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
         // running.
         app.title_reveal = 1.0f;
         if (SDL_strcmp(view, "none") == 0) {
-            app.screen = ui::Screen::Flight;
+            app.stack = {ui::Screen::Flight};
             app.hud_hidden = true;
         } else if (SDL_strcmp(view, "cutter") == 0) {
-            app.screen = ui::Screen::Flight;
+            app.stack = {ui::Screen::Flight};
         } else if (SDL_strcmp(view, "help") == 0) {
-            app.screen = ui::screen_from_name("manual");
+            app.stack = {ui::screen_from_name("manual")};
         } else if (SDL_strcmp(view, "models") == 0) {
-            app.screen = ui::screen_from_name("viewer");
+            app.stack = {ui::screen_from_name("viewer")};
         } else if (SDL_strcmp(view, "startup") == 0) {
-            app.screen = ui::Screen::Startup;
+            app.stack = {ui::Screen::Startup};
         } else {
             const ui::Screen named = ui::screen_from_name(view);
             // Flight is the fallback: a name the graph does not know - "map" among them now, the
             // screen plan 05 deleted - is not the plate.
-            app.screen = named == ui::Screen::Startup ? ui::Screen::Flight : named;
+            app.stack = {named == ui::Screen::Startup ? ui::Screen::Flight : named};
         }
         if (SDL_strcmp(view, "map") == 0 && app.world.system.bodies.size() > 4) {
             // The map view became the system-scale flight shot (plan 05 J2): Halberd framed, the
@@ -118,7 +118,7 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
         app.camera = active_camera(app, width, height);
         // The map and the plate are built from the world as it stands after the scripted flight,
         // which is the same order the loop uses: the frame first, then the camera that frames it.
-        if (app.screen == ui::Screen::Startup) {
+        if (app.current() == ui::Screen::Startup) {
             app.map_frame = orrery_frame_for(app.world, app.map_target);
             app.camera = active_camera(app, width, height);
         }
@@ -126,7 +126,7 @@ int run_capture(App &app, const char *path, const char *view, double seconds) {
             // One planet filling the frame: the golden that holds the albedo map, the cloud deck
             // and the night lights in reach (plan-04 s3.4). The flight camera frames Tessera the
             // way a double-click would (s2.1), which is how a player gets there now.
-            app.screen = ui::Screen::Flight;
+            app.stack = {ui::Screen::Flight};
             const int body = app.world.system.index_of("tessera");
             if (body >= 0 && static_cast<size_t>(body) < app.world.system.bodies.size()) {
                 app.follow_body = body;
