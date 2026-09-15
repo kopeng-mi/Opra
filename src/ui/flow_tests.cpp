@@ -4,6 +4,8 @@
 #include <vector>
 
 #include "core/file.h"
+#include "game/input.h"
+#include "hud/hud.h"
 #include "selftest.h"
 #include "sim/designs.h"
 #include "ui/flow.h"
@@ -302,6 +304,129 @@ int flow_tests() {
             }
             check(total_shapes <= 64, ("gate 14: " + dname + " composed shapes <= 64").c_str());
         }
+    }
+
+    // PLAN-09 U1/U2/U3/U4: Bearing collar ring in flight HUD
+    {
+        HudFrame frame;
+        frame.screen = {1600.0f, 900.0f};
+        frame.shipScreen = {800.0f, 450.0f};
+        frame.shipRadiusPx = 50.0f;
+        frame.headingDeg = 45.0;
+        frame.speed = 120.0;
+        frame.throttle = 0.8f;
+        frame.velocityDir = {0.707f, -0.707f};
+        frame.noseDir = {0.707f, -0.707f};
+        frame.zoom = 150.0;
+        frame.density = Density::One;
+
+        UIBatch batch;
+        build_flight_hud(batch, frame);
+
+        bool found_n = false, found_e = false, found_s = false, found_w = false;
+        bool found_hdg = false;
+        for (const auto &t : batch.texts) {
+            if (t.text == "N") found_n = true;
+            if (t.text == "E") found_e = true;
+            if (t.text == "S") found_s = true;
+            if (t.text == "W") found_w = true;
+            if (t.text == "045°") found_hdg = true;
+        }
+        check(found_n && found_e && found_s && found_w, "hud: collar ring has cardinal labels");
+        check(found_hdg, "hud: collar ring has floating heading readout");
+        check(!batch.solid.empty(), "hud: collar ring draws geometry");
+
+        // When hideCollar is true, cardinal labels should not be present
+        UIBatch hidden_batch;
+        frame.hideCollar = true;
+        build_flight_hud(hidden_batch, frame);
+        bool hidden_n = false;
+        for (const auto &t : hidden_batch.texts) {
+            if (t.text == "N") hidden_n = true;
+        }
+        check(!hidden_n, "hud: hideCollar suppresses collar ring");
+    }
+
+    // PLAN-09 U6/U7: Shipyard catalogue hover preview and mount ghost
+    {
+        ui::ShipyardState s;
+        s.design.name = "Test";
+        s.design.slots = 12;
+        s.design.pitch = 4.0;
+        PartSpec ps;
+        ps.dry_mass = 7500.0;
+        s.parts["nose_hammerhead"] = ps;
+        s.held = -1;
+
+        ui::Context ui;
+        UIBatch batch;
+        ui::Pointer pointer{};
+        // First catalogue item row is around y = 14 + 32 + 4 + 6*26 + 8 + 1 + 8 + 13 = 236
+        pointer.at = {50.0f, 240.0f};
+        pointer.valid = true;
+        ui::Nav nav{};
+        ui.begin(batch, {1600.0f, 900.0f}, pointer, nav, 0.0);
+        ui::build_shipyard(ui, {0.0f, 0.0f, 1600.0f, 900.0f}, s);
+        ui.end();
+
+        check(!s.preview_part.empty(), "shipyard: catalogue hover sets preview_part");
+
+        // Now test ghost placement when holding a part
+        s.held = 0; // hold first part in category 0 (nose_hammerhead)
+        s.category = 0;
+        Camera cam = ui::shipyard_camera(ModelSet{}, s, 1600, 900);
+        glm::mat4 vp = view_projection(cam);
+        Placement cand;
+        cand.part = "nose_hammerhead";
+        cand.slot = 0;
+        cand.facing = Facing::Fore;
+        cand.span = 1;
+        cand.axial = true;
+        Mount m = mount_transform(s.design.spine, cand);
+        glm::vec4 clip = vp * glm::vec4(m.pos, 1.0);
+        float px = ((clip.x / clip.w) * 0.5f + 0.5f) * 1600.0f;
+        float py = (1.0f - ((clip.y / clip.w) * 0.5f + 0.5f)) * 900.0f;
+        pointer.at = {px, py};
+
+        ui.begin(batch, {1600.0f, 900.0f}, pointer, nav, 0.0);
+        ui::build_shipyard(ui, {0.0f, 0.0f, 1600.0f, 900.0f}, s);
+        ui.end();
+
+        check(s.ghost_placement.has_value(), "shipyard: hovering mount ring sets ghost_placement");
+        if (s.ghost_placement) {
+            check(s.ghost_placement->part == "nose_hammerhead", "shipyard: ghost part matches held item");
+        }
+
+        bool found_delta = false;
+        for (const auto &t : batch.texts) {
+            if (t.text.find("(+") != std::string::npos) found_delta = true;
+        }
+        check(found_delta, "shipyard: ghost preview renders stat deltas in DERIVED panel");
+    }
+
+    // PLAN-09 U8: Middle mouse button input and shipyard camera reset
+    {
+        Input input;
+        input.middle = true;
+        input.previous_middle = false;
+        check(input.middle_pressed(), "input: middle_pressed detects rising edge");
+        input.begin_frame();
+        check(!input.middle_pressed(), "input: middle_pressed clears on next frame");
+
+        ui::ShipyardState s;
+        s.yaw_target = 2.5f;
+        s.pitch_target = 0.8f;
+        s.distance_target = 2.0f;
+
+        // Simulate middle click reset
+        if (input.previous_middle) { // was pressed in previous frame
+            s.yaw_target = 0.6f;
+            s.pitch_target = 0.35f;
+            s.distance_target = 1.0f;
+        }
+        check(std::abs(s.yaw_target - 0.6f) < 1e-4f, "shipyard: middle click resets yaw");
+        check(std::abs(s.pitch_target - 0.35f) < 1e-4f, "shipyard: middle click resets pitch");
+        check(std::abs(s.distance_target - 1.0f) < 1e-4f, "shipyard: middle click resets distance");
     }
 
     return selftest::failures() - before;

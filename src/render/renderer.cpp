@@ -8,6 +8,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
 
+#include "core/file.h"
 #include "core/log.h"
 #include "gpu/gpu.h"
 #include "render/mesh.h"
@@ -537,7 +538,8 @@ void load_rock_tiles(Renderer &renderer) {
     for (const char *name :
          {"rock_silicate", "rock_carbonaceous", "rock_ore", "rock_regolith"}) {
         const render::LoadedTexture loaded =
-            render::load_texture(renderer.device, "assets/textures/" + std::string(name) + ".png",
+            render::load_texture(renderer.device,
+                                 asset_path("assets/textures/" + std::string(name) + ".png"),
                                  true);
         renderer.textures.push_back(loaded.texture);
     }
@@ -1146,7 +1148,7 @@ SDL_GPUTexture *Renderer::map_texture(const std::string &name) {
     if (auto found = body_maps.find(name); found != body_maps.end()) return found->second;
     if (!body_manifest_read) {
         body_manifest_read = true;
-        std::ifstream manifest("assets/textures/manifest.json");
+        std::ifstream manifest(asset_path("assets/textures/manifest.json"));
         if (!manifest) SDL_Log("map_texture: the manifest does not open (cwd below the repo?)");
         if (manifest) {
             json entries;
@@ -1157,7 +1159,7 @@ SDL_GPUTexture *Renderer::map_texture(const std::string &name) {
             }
             for (auto entry = entries.begin(); entry != entries.end(); ++entry) {
                 if (body_maps.count(entry.key())) continue;
-                const std::string path = "assets/textures/" + entry.key() + ".png";
+                const std::string path = asset_path("assets/textures/" + entry.key() + ".png");
                 const bool srgb = entry.value().value("srgb", true);
                 const render::LoadedTexture loaded = render::load_texture(device, path, srgb);
                 body_maps[entry.key()] = loaded.texture;

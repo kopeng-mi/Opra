@@ -54,6 +54,15 @@ float body_pixel_radius(const Camera &camera, const World &world, int index, flo
     return static_cast<float>(pixels);
 }
 
+bool in_flight_glass(const glm::vec2 &pt, float width, float height) {
+    const float inset = std::max(28.0f, std::min(width, height) * 0.03f);
+    if (pt.y < inset + 50.0f) return false; // top strip
+    if (pt.y > height - inset - 120.0f && std::abs(pt.x - width * 0.5f) < 550.0f) return false; // bottom arc
+    if (pt.x < inset + 320.0f && pt.y > inset + 60.0f) return false; // left blocks
+    if (pt.x > width - inset - 320.0f && pt.y > inset + 60.0f) return false; // right blocks
+    return true;
+}
+
 void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     // Under --debug, every key the game receives and every pause transition: the log a support
     // report is read from. Silent otherwise.
@@ -255,6 +264,12 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
             app.shipyard_state.pitch_target = 0.35f;
         }
 
+        if (input.middle_pressed()) {
+            app.shipyard_state.yaw_target = 0.6f;
+            app.shipyard_state.pitch_target = 0.35f;
+            app.shipyard_state.distance_target = 1.0f;
+        }
+
         if (input.pointer.x > 260.0f && input.pointer.x < static_cast<float>(width) - 300.0f) {
             if (input.wheel != 0.0f) {
                 app.shipyard_state.distance_target = std::clamp(
@@ -276,6 +291,7 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         app.shipyard_state.yaw += dyaw * k;
         app.shipyard_state.pitch += (app.shipyard_state.pitch_target - app.shipyard_state.pitch) * k;
         app.shipyard_state.distance += (app.shipyard_state.distance_target - app.shipyard_state.distance) * k;
+        app.shipyard_state.preview_yaw += static_cast<float>(dt) * 0.8f;
 
         if (pressed(input, Action::Pause)) {
             ui::apply(app.stack, Action::Pause);
@@ -291,6 +307,7 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
     app.pointer.released = input.left_released();
     app.pointer.right_down = input.right;
     app.pointer.right_pressed = input.right_pressed();
+    app.pointer.middle_pressed = input.middle_pressed();
     app.pointer.wheel = input.wheel;
     app.nav.next = input.pressed(SDL_SCANCODE_TAB) || input.pressed(SDL_SCANCODE_DOWN);
     app.nav.previous = input.pressed(SDL_SCANCODE_UP);
@@ -322,7 +339,7 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         app.half_height = clamp_half_height(app.half_height * std::exp(notch));
     }
     // Home (s2.1): the flight framing and the ship, wherever the wheel had got to.
-    if (pressed(input, Action::ZoomReset)) {
+    if (pressed(input, Action::ZoomReset) || input.middle_pressed()) {
         app.half_height = HOME_HALF;
         app.follow_body = -1;
         app.camera_look = glm::dvec2(0.0);
@@ -381,24 +398,48 @@ void update_app(App &app, Uint32 width, Uint32 height, Real dt) {
         choice.manual = true;
         app.toast(minimap_mode_name(choice.mode));
     }
-    // The camera's freedom (J1): Ctrl and the mouse swing the eye inside a 30-degree cone about
-    // the home axis. On press the cursor position is held; while held, the drag from that anchor
-    // is the cone angle, clamped; release and the angle walks back home, so a look is never a new
-    // home. The follow point does not move during a look - at system zoom an unbounded pan would
-    // lose the ship, which is why the plan-04 plane grab is gone.
-    const bool looking = input.pointer_valid &&
-                         (input.held(SDL_SCANCODE_LCTRL) || input.held(SDL_SCANCODE_RCTRL));
-    if (looking) {
+    // The camera's freedom (J1, PLAN-09 U8): L-drag (with 3px deadzone) or Ctrl-drag
+    // swings the eye inside a 30-degree cone about the home axis. R-drag pans the follow point.
+    // Release eases back home.
+    const bool ctrl_looking = input.pointer_valid &&
+                              (input.held(SDL_SCANCODE_LCTRL) || input.held(SDL_SCANCODE_RCTRL));
+    const bool glass = input.pointer_valid &&
+                       in_flight_glass(input.pointer, static_cast<float>(width), static_cast<float>(height));
+
+    if (ctrl_looking) {
         if (!app.look_anchor.has_value()) {
             app.look_anchor = input.pointer;
         } else {
             look_cone_step(app.camera_look, app.look_anchor->x, app.look_anchor->y, input.pointer.x,
                            input.pointer.y, static_cast<double>(height));
         }
+        app.look_dragging = true;
+    } else if (input.left) {
+        if (input.left_pressed() && glass) {
+            app.look_anchor = input.pointer;
+            app.look_dragging = false;
+        }
+        if (app.look_anchor.has_value()) {
+            if (!app.look_dragging && glm::length(input.pointer - *app.look_anchor) >= 3.0f) {
+                app.look_dragging = true;
+            }
+            if (app.look_dragging) {
+                look_cone_step(app.camera_look, app.look_anchor->x, app.look_anchor->y, input.pointer.x,
+                               input.pointer.y, static_cast<double>(height));
+            }
+        }
     } else {
         app.look_anchor.reset();
+        app.look_dragging = false;
         // A look is a look: let go and the eye eases back to the home axis.
         app.camera_look = look_cone_release(app.camera_look, dt, config::LOOK_RELEASE_TAU);
+    }
+
+    // Right-drag pan (PLAN-09 U8): nudges the follow target in world metres
+    if (input.right && glass && glm::length(input.pointer_delta) > 0.0f) {
+        const double metres_per_px = app.camera.half_height * 2.0 / static_cast<double>(height);
+        app.follow.target.x -= static_cast<double>(input.pointer_delta.x) * metres_per_px;
+        app.follow.target.y += static_cast<double>(input.pointer_delta.y) * metres_per_px;
     }
 
     if (app.settings.reduced_motion) {

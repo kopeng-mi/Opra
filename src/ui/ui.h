@@ -27,6 +27,7 @@ struct Pointer {
     bool released = false;
     bool right_down = false;
     bool right_pressed = false;
+    bool middle_pressed = false;
     float wheel = 0.0f;
     bool valid = false;
 };

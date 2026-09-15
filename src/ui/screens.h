@@ -88,6 +88,12 @@ struct ShipyardState {
     bool mirror = true;
     bool show_flanges = true;
 
+    // Catalogue 3D hover preview and mount ghost (PLAN-09 U6, U7)
+    std::string preview_part;
+    float preview_yaw = 0.0f;
+    std::optional<Placement> ghost_placement;
+    std::optional<Placement> ghost_mirror;
+
     // Turntable
     float yaw = 0.6f;
     float pitch = 0.35f;

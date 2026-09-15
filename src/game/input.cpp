@@ -10,6 +10,7 @@ void Input::begin_frame() {
     std::memcpy(previous, keys, sizeof keys);
     previous_left = left;
     previous_right = right;
+    previous_middle = middle;
     pointer_delta = glm::vec2(0.0f, 0.0f);
     wheel = 0.0f;
 }
@@ -32,12 +33,14 @@ bool apply_event(const SDL_Event &event, Input &input) {
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
             if (event.button.button == SDL_BUTTON_LEFT) input.left = true;
             if (event.button.button == SDL_BUTTON_RIGHT) input.right = true;
+            if (event.button.button == SDL_BUTTON_MIDDLE) input.middle = true;
             input.pointer = glm::vec2(event.button.x, event.button.y);
             input.pointer_valid = true;
             break;
         case SDL_EVENT_MOUSE_BUTTON_UP:
             if (event.button.button == SDL_BUTTON_LEFT) input.left = false;
             if (event.button.button == SDL_BUTTON_RIGHT) input.right = false;
+            if (event.button.button == SDL_BUTTON_MIDDLE) input.middle = false;
             break;
         case SDL_EVENT_MOUSE_WHEEL:
             input.wheel += event.wheel.y;
@@ -46,6 +49,7 @@ bool apply_event(const SDL_Event &event, Input &input) {
             std::memset(input.keys, 0, sizeof input.keys);
             input.left = false;
             input.right = false;
+            input.middle = false;
             break;
         default:
             break;

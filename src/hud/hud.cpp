@@ -662,6 +662,133 @@ void build_arc(UIBatch &batch, const HudFrame &frame, float width, float height)
     }
 }
 
+void build_collar_ring(UIBatch &batch, const HudFrame &frame) {
+    if (frame.hideCollar || frame.wrecked || frame.zoom > 2000.0) return;
+
+    const float radius = frame.shipRadiusPx + 40.0f;
+    if (radius < 15.0f) return;
+
+    const glm::vec2 centre = frame.shipScreen;
+    const float ring_alpha = density_at_least(frame.density, Density::Two) ? 0.65f : 0.35f;
+
+    // 1. The main circular collar ring: 48 segments
+    constexpr int kRingSegments = 48;
+    for (int i = 0; i < kRingSegments; ++i) {
+        const float a0 = (static_cast<float>(i) / kRingSegments) * TAU;
+        const float a1 = (static_cast<float>(i + 1) / kRingSegments) * TAU;
+        const glm::vec2 p0 = centre + glm::vec2(std::cos(a0), std::sin(a0)) * radius;
+        const glm::vec2 p1 = centre + glm::vec2(std::cos(a1), std::sin(a1)) * radius;
+        push_line(batch, p0, p1, 1.0f, with_alpha(ETCH, ring_alpha));
+    }
+
+    // 2. 360-degree tick marks every 10 degrees, with cardinal labels (N/E/S/W)
+    for (int deg = 0; deg < 360; deg += 10) {
+        const float rad = static_cast<float>(deg) * DEG;
+        const glm::vec2 dir(std::sin(rad), -std::cos(rad));
+        const bool cardinal = (deg % 90 == 0);
+        const bool semi_major = (deg % 30 == 0);
+        const float tick_len = cardinal ? 8.0f : (semi_major ? 5.0f : 3.0f);
+        const float tick_alpha = cardinal ? (ring_alpha * 1.2f) : (ring_alpha * 0.7f);
+
+        push_line(batch, centre + dir * radius, centre + dir * (radius + tick_len), 1.0f,
+                  with_alpha(ETCH, std::min(1.0f, tick_alpha)));
+
+        if (cardinal) {
+            const char *label = (deg == 0) ? "N" : (deg == 90) ? "E" : (deg == 180) ? "S" : "W";
+            const glm::vec2 label_pos = centre + dir * (radius + 18.0f) + glm::vec2(0.0f, -4.0f);
+            push_text(batch, label, 11.0f, label_pos, TextAlign::Center,
+                      with_alpha(ETCH_DIM, ring_alpha * 1.2f), TextFace::Label);
+        }
+    }
+
+    // 3. Ship nose / heading index on the ring
+    const double nose_deg = std::isnan(frame.headingDeg) ? 0.0 : frame.headingDeg;
+    const float nose_rad = static_cast<float>(nose_deg) * DEG;
+    const glm::vec2 nose_dir(std::sin(nose_rad), -std::cos(nose_rad));
+    const glm::vec2 nose_perp(-nose_dir.y, nose_dir.x);
+    const glm::vec2 p_nose = centre + nose_dir * radius;
+    push_triangle(batch, p_nose + nose_dir * 8.0f, p_nose - nose_perp * 4.0f,
+                  p_nose + nose_perp * 4.0f, with_alpha(ETCH, 0.85f));
+
+    // 4. Center vectors: velocity vector and thrust vector
+    if (frame.speed >= 0.05) {
+        const float v_len = glm::length(frame.velocityDir);
+        if (v_len > 1e-4f) {
+            const glm::vec2 v_dir = frame.velocityDir / v_len;
+            const float line_len = radius * 0.65f;
+            const glm::vec2 p_tip = centre + v_dir * line_len;
+            const glm::vec2 v_perp(-v_dir.y, v_dir.x);
+
+            push_line(batch, centre, p_tip, 1.5f, with_alpha(NAV, 0.60f));
+            push_line(batch, p_tip, p_tip - v_dir * 6.0f + v_perp * 4.0f, 1.5f, with_alpha(NAV, 0.60f));
+            push_line(batch, p_tip, p_tip - v_dir * 6.0f - v_perp * 4.0f, 1.5f, with_alpha(NAV, 0.60f));
+        }
+    }
+
+    if (frame.throttle > 0.01f) {
+        const float t_len = glm::length(frame.noseDir);
+        if (t_len > 1e-4f) {
+            const glm::vec2 t_dir = frame.noseDir / t_len;
+            const float line_len = radius * 0.50f * ui::clamp01(frame.throttle);
+            const glm::vec2 p_tip = centre + t_dir * line_len;
+            const glm::vec2 t_perp(-t_dir.y, t_dir.x);
+
+            push_line(batch, centre, p_tip, 1.5f, with_alpha(DRIVE, 0.70f));
+            push_line(batch, p_tip, p_tip - t_dir * 5.0f + t_perp * 3.5f, 1.5f, with_alpha(DRIVE, 0.70f));
+            push_line(batch, p_tip, p_tip - t_dir * 5.0f - t_perp * 3.5f, 1.5f, with_alpha(DRIVE, 0.70f));
+        }
+    }
+
+    // 5. Marks on the ring: prograde, retrograde, targets, hostiles
+    if (frame.speed >= 0.05) {
+        const float v_len = glm::length(frame.velocityDir);
+        if (v_len > 1e-4f) {
+            const glm::vec2 v_dir = frame.velocityDir / v_len;
+            const glm::vec2 p_pro = centre + v_dir * radius;
+            const glm::vec2 p_retro = centre - v_dir * radius;
+
+            // Prograde: circle with central dot
+            push_arc(batch, p_pro, 4.5f, 0.0f, TAU, 1.2f, NAV);
+            push_disc(batch, p_pro, 1.5f, NAV);
+
+            // Retrograde: circle with cross
+            push_arc(batch, p_retro, 4.5f, 0.0f, TAU, 1.2f, with_alpha(NAV, 0.75f));
+            push_line(batch, p_retro - glm::vec2(3.0f, 3.0f), p_retro + glm::vec2(3.0f, 3.0f), 1.2f,
+                      with_alpha(NAV, 0.75f));
+            push_line(batch, p_retro - glm::vec2(-3.0f, 3.0f), p_retro + glm::vec2(-3.0f, 3.0f), 1.2f,
+                      with_alpha(NAV, 0.75f));
+        }
+    }
+
+    for (const CollarMark &mark : frame.marks) {
+        const glm::vec2 mark_dir(std::sin(mark.bearing), -std::cos(mark.bearing));
+        const glm::vec2 p_mark = centre + mark_dir * radius;
+        if (mark.kind == MarkKind::Target) {
+            // Target diamond
+            push_line(batch, p_mark + glm::vec2(0.0f, -5.0f), p_mark + glm::vec2(5.0f, 0.0f), 1.5f, NAV);
+            push_line(batch, p_mark + glm::vec2(5.0f, 0.0f), p_mark + glm::vec2(0.0f, 5.0f), 1.5f, NAV);
+            push_line(batch, p_mark + glm::vec2(0.0f, 5.0f), p_mark + glm::vec2(-5.0f, 0.0f), 1.5f, NAV);
+            push_line(batch, p_mark + glm::vec2(-5.0f, 0.0f), p_mark + glm::vec2(0.0f, -5.0f), 1.5f, NAV);
+        } else if (mark.kind == MarkKind::Hostile) {
+            const glm::vec2 m_perp(-mark_dir.y, mark_dir.x);
+            push_line(batch, p_mark - mark_dir * 5.0f + m_perp * 5.0f, p_mark, 1.5f, THREAT);
+            push_line(batch, p_mark - mark_dir * 5.0f - m_perp * 5.0f, p_mark, 1.5f, THREAT);
+        }
+    }
+
+    // 6. Floating speed and heading readouts near the ring
+    const glm::vec2 spd_pos = {centre.x, centre.y + radius + 18.0f};
+    std::string spd_str = (frame.speed > 0.05) ? readout(static_cast<float>(frame.speed), 1, " m/s") : "0.0 m/s";
+    push_text(batch, spd_str.c_str(), 16.0f, spd_pos, TextAlign::Center,
+              with_alpha(ETCH, std::min(1.0f, ring_alpha * 1.3f)), TextFace::Readout);
+
+    const glm::vec2 hdg_pos = {centre.x, centre.y - radius - 20.0f};
+    char hdg_str[16];
+    std::snprintf(hdg_str, sizeof hdg_str, "%03.0f°", nose_deg);
+    push_text(batch, hdg_str, 16.0f, hdg_pos, TextAlign::Center,
+              with_alpha(ETCH, std::min(1.0f, ring_alpha * 1.3f)), TextFace::Readout);
+}
+
 void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
     const float width = frame.screen.x;
     const float height = frame.screen.y;
@@ -743,6 +870,9 @@ void build_flight_hud(UIBatch &batch, const HudFrame &frame) {
                       with_alpha(ETCH_DIM, RANGE_RING_LABEL_ALPHA), TextFace::Label);
         }
     }
+
+    // Bearing collar ring around ship (PLAN-09 U1, U2, U3, U4)
+    build_collar_ring(batch, frame);
 
     // Bottom arc instrument (plan 06 §3.2, L3, L4, fixes T-5, T-7, T-13)
     build_arc(batch, frame, width, height);

@@ -507,8 +507,10 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
     ShipyardResult result;
     UIBatch &batch = *ui.batch();
 
-    // 1. Left column: CATALOGUE (PLAN-08 §8)
     const float left_w = 260.0f;
+    const float right_w = 300.0f;
+
+    // 1. Left column: CATALOGUE (PLAN-08 §8)
     const Rect left_panel{0.0f, 0.0f, left_w, screen.h};
     ui.panel(left_panel, with_alpha(tokens::FIELD, 0.92f));
     ui.push(left_panel);
@@ -536,6 +538,7 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
     ui.cut_top(8.0f);
 
     const auto &cat_items = kCatalogue[std::clamp(state.category, 0, kCatCount - 1)];
+    std::string hovered_cat_part;
     for (size_t j = 0; j < cat_items.size(); ++j) {
         const auto &item = cat_items[j];
         const bool is_held = (state.held == static_cast<int>(j));
@@ -543,12 +546,21 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
             ui.panel({left_panel.x + 8.0f, ui.area().y + 1.0f, left_w - 16.0f, 26.0f},
                      with_alpha(tokens::DRIVE, 0.3f));
         }
+        const Rect row_rect = ui.cut_top(26.0f);
+        if (row_rect.contains(ui.pointer().at)) {
+            hovered_cat_part = item.id;
+        }
         char row_txt[64];
         std::snprintf(row_txt, sizeof row_txt, "%-16s %6s", item.label, item.mass_label);
-        if (ui.row(item.id, ui.cut_top(26.0f), row_txt, static_cast<int>(j),
+        if (ui.row(item.id, row_rect, row_txt, static_cast<int>(j),
                    is_held ? tokens::DRIVE : tokens::ETCH_DIM)) {
             state.held = is_held ? -1 : static_cast<int>(j);
         }
+    }
+    if (state.held == -1) {
+        state.preview_part = hovered_cat_part;
+    } else {
+        state.preview_part.clear();
     }
 
     // Bottom toggles
@@ -566,101 +578,7 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
     ui.pop();
     ui.pop();
 
-    // 2. Right column: DERIVED stats
-    const float right_w = 300.0f;
-    const Rect right_panel{screen.w - right_w, 0.0f, right_w, screen.h};
-    ui.panel(right_panel, with_alpha(tokens::FIELD, 0.92f));
-    ui.push(right_panel);
-    ui.push(ui.inset(right_panel, 14.0f));
-
-    ui.label(ui.cut_top(32.0f), "DERIVED", 22.0f, TextAlign::Left, tokens::ETCH);
-    ui.label(ui.cut_top(18.0f), state.design.name.empty() ? "Custom" : state.design.name.c_str(),
-             14.0f, TextAlign::Left, tokens::NAV, TextFace::Label);
-    ui.rule(ui.cut_top(1.0f), with_alpha(tokens::ETCH, 0.2f));
-    ui.cut_top(8.0f);
-
-    if (state.spec_dirty) {
-        state.cached_spec = derive_spec(state.design, state.parts);
-        state.spec_dirty = false;
-    }
-
-    const Real M_dry = state.cached_spec.mass;
-    const Real M_fuel = state.cached_spec.fuel;
-    const Real thrust = state.cached_spec.thrust;
-    const Real twr = calculate_twr(thrust, M_dry + M_fuel);
-    const Real dv = calculate_delta_v(thrust, M_dry, M_dry + M_fuel) / 1000.0;
-    const Real torque = state.cached_spec.torque;
-    const Real hull = state.cached_spec.hull;
-    const Real heat_load = calculate_heat_load(thrust);
-    const Real thermal_margin = calculate_thermal_margin(state.cached_spec.cooling, heat_load);
-
-    const auto stat_row = [&](const char *label, const char *val, const char *unit,
-                              const glm::vec4 &col = tokens::ETCH) {
-        const Rect row = ui.cut_top(22.0f);
-        ui.label({row.x, row.y, 110.0f, row.h}, label, 12.0f, TextAlign::Left, tokens::ETCH_DIM, TextFace::Label);
-        ui.label({row.x + 110.0f, row.y, 100.0f, row.h}, val, 13.0f, TextAlign::Right, col, TextFace::Label);
-        ui.label({row.x + 215.0f, row.y, 55.0f, row.h}, unit, 12.0f, TextAlign::Left, tokens::ETCH_DIM, TextFace::Label);
-    };
-
-    char buf[64];
-    std::snprintf(buf, sizeof buf, "%.1f", M_dry / 1000.0);
-    stat_row("DRY MASS", buf, "t");
-
-    std::snprintf(buf, sizeof buf, "%.1f", M_fuel / 1000.0);
-    stat_row("PROPELLANT", buf, "t");
-
-    std::snprintf(buf, sizeof buf, "%.1f", (M_dry + M_fuel) / 1000.0);
-    stat_row("ALL-UP", buf, "t");
-
-    std::snprintf(buf, sizeof buf, "%.0f", thrust / 1000.0);
-    stat_row("THRUST", buf, "kN");
-
-    std::snprintf(buf, sizeof buf, "%.2f", twr);
-    stat_row("TWR @ 1g", buf, "—", twr < 1.0 ? tokens::THREAT : tokens::ETCH);
-
-    if (dv > 0.0) std::snprintf(buf, sizeof buf, "%.1f", dv);
-    else std::snprintf(buf, sizeof buf, "—");
-    stat_row("ΔV", buf, "km/s");
-
-    std::snprintf(buf, sizeof buf, "%.3f", torque);
-    stat_row("TORQUE", buf, "rad/s²");
-
-    std::snprintf(buf, sizeof buf, "%.0f", hull);
-    stat_row("HULL", buf, "—");
-
-    std::snprintf(buf, sizeof buf, "%.1f", thermal_margin);
-    stat_row("THERMAL", buf, "kW", thermal_margin < 0.0 ? tokens::THREAT : tokens::ETCH);
-
-    // Status checks
-    const bool check_drive = state.design_has_drive();
-    const bool check_twr = twr > 0.0;
-    const Vec2 com = centre_of_mass(state.design, state.parts);
-    const bool check_com = std::abs(com.x) <= 0.6;
-    const bool check_thermal = thermal_margin >= 0.0;
-    const bool check_fuel = M_fuel > 0.0;
-
-    ui.cut_top(8.0f);
-    ui.rule(ui.cut_top(1.0f), with_alpha(tokens::ETCH, 0.2f));
-    ui.cut_top(6.0f);
-
-    auto check_line = [&](bool ok, const char *line_label) {
-        const Rect row = ui.cut_top(20.0f);
-        ui.label({row.x, row.y, 16.0f, row.h}, ok ? "✓" : "✗", 13.0f, TextAlign::Left,
-                 ok ? tokens::NAV : tokens::THREAT, TextFace::Label);
-        ui.label({row.x + 18.0f, row.y, row.w - 18.0f, row.h}, line_label, 12.0f, TextAlign::Left,
-                 ok ? tokens::ETCH : tokens::THREAT, TextFace::Label);
-    };
-
-    check_line(check_drive, "drive installed");
-    check_line(check_twr, "TWR over 0.0");
-    check_line(check_com, "thrust line on centre");
-    check_line(check_thermal, "thermal margin >= 0 kW");
-    check_line(check_fuel, "propellant loaded");
-
-    ui.pop();
-    ui.pop();
-
-    // 3. Middle area: ghost rings, turntable picking
+    // 2. Precompute candidate ghost placement and ring hover (PLAN-09 U6)
     const Camera cam = shipyard_camera(ModelSet{}, state, static_cast<uint32_t>(screen.w), static_cast<uint32_t>(screen.h));
     const glm::mat4 vp = view_projection(cam);
     const float px_per_m = static_cast<float>(screen.h) / (2.0f * static_cast<float>(cam.half_height));
@@ -705,15 +623,193 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
                             best_facing = f;
                             best_ok = ok;
                         }
-                        glm::vec4 ring_col = with_alpha(tokens::NAV, 0.35f);
-                        if (d <= 26.0f) {
-                            ring_col = ok ? with_alpha(tokens::DRIVE, 0.9f) : with_alpha(tokens::THREAT, 0.9f);
-                        }
+                    }
+                }
+            }
+        }
+
+        if (best_slot >= 0 && best_ok) {
+            Placement cand;
+            cand.part = item.id;
+            cand.slot = best_slot;
+            cand.facing = best_facing;
+            cand.span = 1;
+            cand.axial = item.axial;
+            state.ghost_placement = cand;
+            if (state.mirror && !item.axial) {
+                Placement mir = cand;
+                mir.facing = opposite_facing(best_facing);
+                state.ghost_mirror = mir;
+            } else {
+                state.ghost_mirror.reset();
+            }
+        } else {
+            state.ghost_placement.reset();
+            state.ghost_mirror.reset();
+        }
+    } else {
+        state.ghost_placement.reset();
+        state.ghost_mirror.reset();
+    }
+
+    // 3. Right column: DERIVED stats and deltas (PLAN-09 §3.3)
+    const Rect right_panel{screen.w - right_w, 0.0f, right_w, screen.h};
+    ui.panel(right_panel, with_alpha(tokens::FIELD, 0.92f));
+    ui.push(right_panel);
+    ui.push(ui.inset(right_panel, 14.0f));
+
+    ui.label(ui.cut_top(32.0f), "DERIVED", 22.0f, TextAlign::Left, tokens::ETCH);
+    ui.label(ui.cut_top(18.0f), state.design.name.empty() ? "Custom" : state.design.name.c_str(),
+             14.0f, TextAlign::Left, tokens::NAV, TextFace::Label);
+    ui.rule(ui.cut_top(1.0f), with_alpha(tokens::ETCH, 0.2f));
+    ui.cut_top(8.0f);
+
+    if (state.spec_dirty) {
+        state.cached_spec = derive_spec(state.design, state.parts);
+        state.spec_dirty = false;
+    }
+
+    ShipSpec preview_spec = state.cached_spec;
+    bool has_ghost_spec = false;
+    if (state.ghost_placement.has_value()) {
+        ShipDesign preview_design = state.design;
+        mount_placement(preview_design, *state.ghost_placement, state.mirror && !state.ghost_placement->axial);
+        preview_spec = derive_spec(preview_design, state.parts);
+        has_ghost_spec = true;
+    }
+
+    const Real M_dry = state.cached_spec.mass;
+    const Real M_fuel = state.cached_spec.fuel;
+    const Real thrust = state.cached_spec.thrust;
+    const Real twr = calculate_twr(thrust, M_dry + M_fuel);
+    const Real dv = calculate_delta_v(thrust, M_dry, M_dry + M_fuel) / 1000.0;
+    const Real torque = state.cached_spec.torque;
+    const Real hull = state.cached_spec.hull;
+    const Real heat_load = calculate_heat_load(thrust);
+    const Real thermal_margin = calculate_thermal_margin(state.cached_spec.cooling, heat_load);
+
+    const auto format_delta = [&](Real cur, Real prev, const char *fmt) -> std::string {
+        if (!has_ghost_spec) return "";
+        const Real d = cur - prev;
+        if (std::abs(d) < 1e-4) return "";
+        char b[32];
+        std::snprintf(b, sizeof b, fmt, d);
+        return b;
+    };
+
+    const auto stat_row = [&](const char *label, const char *val, const std::string &delta_str, const char *unit,
+                              const glm::vec4 &col = tokens::ETCH, const glm::vec4 &delta_col = tokens::DRIVE) {
+        const Rect row = ui.cut_top(22.0f);
+        ui.label({row.x, row.y, 85.0f, row.h}, label, 12.0f, TextAlign::Left, tokens::ETCH_DIM, TextFace::Label);
+        ui.label({row.x + 85.0f, row.y, 55.0f, row.h}, val, 13.0f, TextAlign::Right, col, TextFace::Label);
+        if (!delta_str.empty()) {
+            ui.label({row.x + 145.0f, row.y, 75.0f, row.h}, delta_str.c_str(), 11.0f, TextAlign::Left, delta_col, TextFace::Label);
+        }
+        ui.label({row.x + 225.0f, row.y, 45.0f, row.h}, unit, 12.0f, TextAlign::Left, tokens::ETCH_DIM, TextFace::Label);
+    };
+
+    char buf[64];
+    std::snprintf(buf, sizeof buf, "%.1f", M_dry / 1000.0);
+    stat_row("DRY MASS", buf, format_delta(preview_spec.mass / 1000.0, M_dry / 1000.0, "(%+.1f)"), "t");
+
+    std::snprintf(buf, sizeof buf, "%.1f", M_fuel / 1000.0);
+    stat_row("PROPELLANT", buf, format_delta(preview_spec.fuel / 1000.0, M_fuel / 1000.0, "(%+.1f)"), "t");
+
+    std::snprintf(buf, sizeof buf, "%.1f", (M_dry + M_fuel) / 1000.0);
+    stat_row("ALL-UP", buf, format_delta((preview_spec.mass + preview_spec.fuel) / 1000.0, (M_dry + M_fuel) / 1000.0, "(%+.1f)"), "t");
+
+    std::snprintf(buf, sizeof buf, "%.0f", thrust / 1000.0);
+    stat_row("THRUST", buf, format_delta(preview_spec.thrust / 1000.0, thrust / 1000.0, "(%+.0f)"), "kN");
+
+    std::snprintf(buf, sizeof buf, "%.2f", twr);
+    stat_row("TWR @ 1g", buf, format_delta(calculate_twr(preview_spec.thrust, preview_spec.mass + preview_spec.fuel), twr, "(%+.2f)"), "—", twr < 1.0 ? tokens::THREAT : tokens::ETCH);
+
+    if (dv > 0.0) std::snprintf(buf, sizeof buf, "%.1f", dv);
+    else std::snprintf(buf, sizeof buf, "—");
+    stat_row("ΔV", buf, format_delta(calculate_delta_v(preview_spec.thrust, preview_spec.mass, preview_spec.mass + preview_spec.fuel) / 1000.0, dv, "(%+.1f)"), "km/s");
+
+    std::snprintf(buf, sizeof buf, "%.3f", torque);
+    stat_row("TORQUE", buf, format_delta(preview_spec.torque, torque, "(%+.3f)"), "rad/s²");
+
+    std::snprintf(buf, sizeof buf, "%.0f", hull);
+    stat_row("HULL", buf, format_delta(preview_spec.hull, hull, "(%+.0f)"), "—");
+
+    std::snprintf(buf, sizeof buf, "%.1f", thermal_margin);
+    stat_row("THERMAL", buf, format_delta(calculate_thermal_margin(preview_spec.cooling, calculate_heat_load(preview_spec.thrust)), thermal_margin, "(%+.1f)"), "kW", thermal_margin < 0.0 ? tokens::THREAT : tokens::ETCH);
+
+    // Status checks
+    const bool check_drive = state.design_has_drive();
+    const bool check_twr = twr > 0.0;
+    const Vec2 com = centre_of_mass(state.design, state.parts);
+    const bool check_com = std::abs(com.x) <= 0.6;
+    const bool check_thermal = thermal_margin >= 0.0;
+    const bool check_fuel = M_fuel > 0.0;
+
+    ui.cut_top(8.0f);
+    ui.rule(ui.cut_top(1.0f), with_alpha(tokens::ETCH, 0.2f));
+    ui.cut_top(6.0f);
+
+    auto check_line = [&](bool ok, const char *line_label) {
+        const Rect row = ui.cut_top(20.0f);
+        ui.label({row.x, row.y, 16.0f, row.h}, ok ? "✓" : "✗", 13.0f, TextAlign::Left,
+                 ok ? tokens::NAV : tokens::THREAT, TextFace::Label);
+        ui.label({row.x + 18.0f, row.y, row.w - 18.0f, row.h}, line_label, 12.0f, TextAlign::Left,
+                 ok ? tokens::ETCH : tokens::THREAT, TextFace::Label);
+    };
+
+    check_line(check_drive, "drive installed");
+    check_line(check_twr, "TWR over 0.0");
+    check_line(check_com, "thrust line on centre");
+    check_line(check_thermal, "thermal margin >= 0 kW");
+    check_line(check_fuel, "propellant loaded");
+
+    ui.pop();
+    ui.pop();
+
+    // 4. Middle area: ghost rings, turntable picking (PLAN-09 §3.4)
+    if (state.held >= 0) {
+        const auto &item = cat_items[static_cast<size_t>(state.held)];
+        const std::vector<Facing> offered_facings = item.axial
+            ? std::vector<Facing>{Facing::Fore, Facing::Aft}
+            : std::vector<Facing>{Facing::Starboard, Facing::Port, Facing::Dorsal, Facing::Ventral};
+
+        for (int s = 0; s < state.design.slots; ++s) {
+            for (Facing f : offered_facings) {
+                Placement p_cand;
+                p_cand.part = item.id;
+                p_cand.slot = s;
+                p_cand.facing = f;
+                p_cand.span = 1;
+                p_cand.axial = item.axial;
+                bool ok = can_mount(state.design.spine, state.design.placements, p_cand);
+                if (state.mirror && !item.axial) {
+                    Placement p_mir = p_cand;
+                    p_mir.facing = opposite_facing(f);
+                    if (!can_mount(state.design.spine, state.design.placements, p_mir)) ok = false;
+                }
+
+                Mount m = mount_transform(state.design.spine, p_cand);
+                glm::vec4 clip = vp * glm::vec4(m.pos, 1.0);
+                if (clip.w > 0.0f) {
+                    float px = ((clip.x / clip.w) * 0.5f + 0.5f) * screen.w;
+                    float py = (1.0f - ((clip.y / clip.w) * 0.5f + 0.5f)) * screen.h;
+                    if (px > left_w && px < screen.w - right_w) {
+                        const bool is_hovered = (s == best_slot && f == best_facing);
+                        const float thick = is_hovered ? 2.0f : 1.0f;
+                        const float a = is_hovered ? 0.95f : 0.40f;
+                        const glm::vec4 ring_col = ok ? with_alpha(tokens::NAV, a) : with_alpha(tokens::THREAT, a);
+
                         for (int seg = 0; seg < 24; ++seg) {
                             float a0 = (seg / 24.0f) * 6.2831853f;
                             float a1 = ((seg + 1) / 24.0f) * 6.2831853f;
                             push_line(batch, {px + std::cos(a0) * ring_r, py + std::sin(a0) * ring_r},
-                                             {px + std::cos(a1) * ring_r, py + std::sin(a1) * ring_r}, 1.0f, ring_col);
+                                             {px + std::cos(a1) * ring_r, py + std::sin(a1) * ring_r}, thick, ring_col);
+                        }
+                        if (is_hovered) {
+                            char slot_buf[32];
+                            std::snprintf(slot_buf, sizeof slot_buf, "slot %d", s);
+                            push_text(batch, slot_buf, 11.0f, {px + ring_r + 6.0f, py - 6.0f}, TextAlign::Left,
+                                      ok ? tokens::DRIVE : tokens::THREAT, TextFace::Label);
                         }
                     }
                 }
@@ -731,6 +827,8 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
                 mount_placement(state.design, new_p, state.mirror && !item.axial);
                 state.spec_dirty = true;
                 state.held = -1;
+                state.ghost_placement.reset();
+                state.ghost_mirror.reset();
             }
         }
     } else {
@@ -755,7 +853,28 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
         }
 
         state.selected = hovered_k;
-        if (hovered_k >= 0 && (ui.pointer().right_pressed || ui.pointer().pressed)) {
+        if (hovered_k >= 0) {
+            const Placement &p = state.design.placements[static_cast<size_t>(hovered_k)];
+            Mount m = mount_transform(state.design.spine, p);
+            glm::vec4 clip = vp * glm::vec4(m.pos, 1.0);
+            if (clip.w > 0.0f) {
+                float px = ((clip.x / clip.w) * 0.5f + 0.5f) * screen.w;
+                float py = (1.0f - ((clip.y / clip.w) * 0.5f + 0.5f)) * screen.h;
+                for (int seg = 0; seg < 24; ++seg) {
+                    float a0 = (seg / 24.0f) * 6.2831853f;
+                    float a1 = ((seg + 1) / 24.0f) * 6.2831853f;
+                    push_line(batch, {px + std::cos(a0) * (ring_r + 4.0f), py + std::sin(a0) * (ring_r + 4.0f)},
+                                     {px + std::cos(a1) * (ring_r + 4.0f), py + std::sin(a1) * (ring_r + 4.0f)}, 1.5f,
+                                     with_alpha(tokens::THREAT, 0.75f));
+                }
+                char rem_buf[96];
+                std::snprintf(rem_buf, sizeof rem_buf, "%s (right-click to remove)", p.part.c_str());
+                push_text(batch, rem_buf, 12.0f, {px + ring_r + 8.0f, py - 6.0f}, TextAlign::Left,
+                          tokens::DRIVE, TextFace::Label);
+            }
+        }
+
+        if (hovered_k >= 0 && ui.pointer().right_pressed) {
             const int grp = state.design.placements[static_cast<size_t>(hovered_k)].group;
             if (grp > 0) {
                 std::vector<Placement> kept;
@@ -817,13 +936,20 @@ ShipyardResult build_shipyard(Context &ui, const Rect &screen, ShipyardState &st
 }
 
 Camera shipyard_camera(const ModelSet &models, const ShipyardState &state, uint32_t width, uint32_t height) {
-    (void)models;
     Camera out;
-    const Real L = static_cast<Real>(state.design.slots) * state.design.pitch;
-    const Real half_len = L * 0.5;
-    const Real half_wid = std::max(static_cast<Real>(state.design.half_width), 2.5);
-    const float diag = static_cast<float>(std::hypot(2.0 * half_len, 2.0 * half_wid));
-    const float extent = std::max(4.0f, diag * 0.5f);
+    float extent = 4.0f;
+    if (state.held == -1 && !state.preview_part.empty() && models.store.has(state.preview_part)) {
+        const ModelMeta &meta = models.store.meta(state.preview_part);
+        const float dx = meta.aabb_max.x - meta.aabb_min.x;
+        const float dy = meta.aabb_max.y - meta.aabb_min.y;
+        extent = std::max(2.5f, std::hypot(dx, dy) * 0.75f);
+    } else {
+        const Real L = static_cast<Real>(state.design.slots) * state.design.pitch;
+        const Real half_len = L * 0.5;
+        const Real half_wid = std::max(static_cast<Real>(state.design.half_width), 2.5);
+        const float diag = static_cast<float>(std::hypot(2.0 * half_len, 2.0 * half_wid));
+        extent = std::max(4.0f, diag * 0.5f);
+    }
     out.half_height = extent * 1.4f * state.distance;
     out.aspect = height > 0 ? static_cast<float>(width) / static_cast<float>(height) : 1.0f;
     out.up = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -836,10 +962,33 @@ Camera shipyard_camera(const ModelSet &models, const ShipyardState &state, uint3
 }
 
 void build_shipyard_scene(SceneBuilder &scene, const ModelSet &models, const ShipyardState &state) {
+    if (state.held == -1 && !state.preview_part.empty() && models.store.has(state.preview_part)) {
+        const glm::quat rot = glm::angleAxis(state.preview_yaw, glm::vec3(0.0f, 0.0f, 1.0f));
+        scene.add_model(models.store.model(state.preview_part), glm::vec3(0.0f), rot,
+                        static_cast<float>(state.design.scale), false, 0.0f);
+        return;
+    }
+
     if (!state.design.placements.empty()) {
         std::vector<Real> jets(state.design.placements.size(), 0.0);
         add_design(scene, models, state.design, glm::vec3(0.0f), glm::quat(1, 0, 0, 0),
                    static_cast<float>(state.design.scale), 3, 0.0f, jets);
+    }
+
+    const float design_scale = static_cast<float>(state.design.scale);
+    if (state.ghost_placement.has_value() && models.store.has(state.ghost_placement->part)) {
+        const Mount m = mount_transform(state.design.spine, *state.ghost_placement);
+        const glm::vec3 at = glm::vec3(m.pos) * design_scale;
+        const glm::quat rot = glm::quat(m.rot);
+        scene.add_model(models.store.model(state.ghost_placement->part), at, rot, design_scale,
+                        false, 0.0f, glm::vec3(0.40f));
+    }
+    if (state.ghost_mirror.has_value() && models.store.has(state.ghost_mirror->part)) {
+        const Mount m = mount_transform(state.design.spine, *state.ghost_mirror);
+        const glm::vec3 at = glm::vec3(m.pos) * design_scale;
+        const glm::quat rot = glm::quat(m.rot);
+        scene.add_model(models.store.model(state.ghost_mirror->part), at, rot, design_scale,
+                        false, 0.0f, glm::vec3(0.40f));
     }
 }
 

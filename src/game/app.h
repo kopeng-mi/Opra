@@ -129,6 +129,7 @@ struct App {
     glm::dvec2 camera_look{0.0};
     /** The cursor position while Ctrl is held: the anchor the cone angle is dragged from. */
     std::optional<glm::vec2> look_anchor;
+    bool look_dragging = false;
     bool cinematic = false;
     /** F10: how much HUD is on. Density 2 is the baseline (plan 05 J7); the context forces blocks. */
     Density density = Density::Two;
